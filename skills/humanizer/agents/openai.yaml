@@ -1,0 +1,4 @@
+interface:
+  display_name: "Humanizer"
+  short_description: "用清楚具体的语言解释技术内容，去掉 AI 套话并保留原有含义"
+  default_prompt: "请用 $humanizer 修改这段文字，解释陌生术语，去掉套话，保留原意和事实。"
