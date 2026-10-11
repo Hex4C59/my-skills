@@ -1,0 +1,70 @@
+{
+  "name": "frontend-art-direction",
+  "version": "1.0.0",
+  "description": "A compact, evidence-led Codex skill for product-specific frontend UI.",
+  "type": "module",
+  "bin": {
+    "frontend-art-direction": "bin/frontend-art-direction.js",
+    "install-frontend-art-direction": "bin/frontend-art-direction.js"
+  },
+  "files": [
+    "SKILL.md",
+    "README.md",
+    "agents",
+    "bin",
+    "scripts",
+    "data",
+    "references",
+    "templates",
+    "docs"
+  ],
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/check.mjs",
+    "inspect": "node scripts/inspect-project.mjs",
+    "map": "node scripts/project-map.mjs",
+    "graph": "node scripts/project-graph.mjs",
+    "brief": "node scripts/design-brief.mjs",
+    "product-context": "node scripts/product-context.mjs",
+    "direction": "node scripts/visual-direction.mjs",
+    "reference": "node scripts/reference-composition.mjs",
+    "scout": "node scripts/reference-scout.mjs",
+    "reference-build": "node scripts/reference-build.mjs",
+    "resource": "node scripts/resource-catalog.mjs",
+    "audit": "node scripts/audit.mjs",
+    "motion": "node scripts/transitions-adapter.mjs",
+    "surface-mode": "node scripts/surface-mode.mjs",
+    "design-operation": "node scripts/design-operation.mjs",
+    "design-loop": "node scripts/design-loop.mjs",
+    "research-atlas": "node scripts/research-atlas.mjs",
+    "live": "node scripts/live-iteration.mjs",
+    "image-proposal": "node scripts/image-proposal.mjs",
+    "critique": "node scripts/visual-critique.mjs",
+    "visual-lint": "node scripts/visual-lint.mjs",
+    "capture": "node scripts/browser-capture.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davaded/frontend-art-direction.git"
+  },
+  "bugs": {
+    "url": "https://github.com/davaded/frontend-art-direction/issues"
+  },
+  "homepage": "https://github.com/davaded/frontend-art-direction#readme",
+  "keywords": [
+    "codex",
+    "skill",
+    "agent-skill",
+    "frontend",
+    "design",
+    "art-direction",
+    "ui-ux"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

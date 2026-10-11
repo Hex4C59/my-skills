@@ -1,0 +1,884 @@
+#!/usr/bin/env node
+
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { buildAudit, renderAuditMarkdown } from "./audit.mjs";
+import { buildBrief, renderBriefMarkdown } from "./design-brief.mjs";
+import { REPO_ROOT, isMainModule, readJson, walkFiles } from "./lib.mjs";
+import { renderScanMarkdown, scanProject } from "./inspect-project.mjs";
+import { buildProjectGraph, queryProjectGraph, renderGraphMarkdown } from "./project-graph.mjs";
+import { mapProject, renderMapMarkdown } from "./project-map.mjs";
+import { queryResources, renderResourceMarkdown } from "./resource-catalog.mjs";
+import { renderReferenceComposition, selectReferenceComposition } from "./reference-composition.mjs";
+import { buildReferenceBuild, renderReferenceBuild } from "./reference-build.mjs";
+import { renderReferenceScout, scoutReferences } from "./reference-scout.mjs";
+import { renderVisualDirection, selectVisualDirection } from "./visual-direction.mjs";
+import { classifySurfaceMode } from "./surface-mode.mjs";
+import { resolveDesignOperation } from "./design-operation.mjs";
+import { buildDesignLoop, renderDesignLoop } from "./design-loop.mjs";
+import { closeDesignLoopSession, createDesignLoopSession, getDesignLoopSession, recordDesignLoopRound } from "./design-loop-session.mjs";
+import { ATLAS_SECTIONS, addResearchAtlasReference, closeResearchAtlas, recordResearchAtlasSection, recordResearchAtlasSkill, recordResearchAtlasSynthesis, renderResearchAtlas } from "./research-atlas.mjs";
+import { addLiveVariant, closeLiveSession, createLiveSession, decideLiveVariant, recordLiveEvent } from "./live-iteration.mjs";
+import { addImageProposal, closeImageProposalSession, createImageProposalSession, decideImageProposal, recordImageEvidence, translateImageProposal } from "./image-proposal.mjs";
+import { addVisualFinding, closeVisualCritiqueSession, createVisualCritiqueSession, recordVisualVerdict } from "./visual-critique.mjs";
+import { lintProject } from "./visual-lint.mjs";
+import { initProductContext, parseProductContext, readProductContext, renderProductContextMarkdown } from "./product-context.mjs";
+import { buildMotionPlan } from "./transitions-adapter.mjs";
+
+const root = REPO_ROOT;
+const errors = [];
+const notes = [];
+const syntheticPng = Buffer.from("89504e470d0a1a0a", "hex");
+
+function fail(message) {
+  errors.push(message);
+}
+
+function assertExists(path) {
+  if (!existsSync(path)) fail(`missing: ${relative(root, path)}`);
+}
+
+function parseFrontmatter(content) {
+  if (!content.startsWith("---\n")) return null;
+  const end = content.indexOf("\n---", 4);
+  if (end < 0) return null;
+  return content.slice(4, end);
+}
+
+function checkMarkdownLinks() {
+  const markdownFiles = walkFiles(root).filter((file) => file.endsWith(".md"));
+  for (const file of markdownFiles) {
+    const content = readFileSync(file, "utf8");
+    const links = [...content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]);
+    for (const link of links) {
+      if (/^(https?:|mailto:|#)/.test(link)) continue;
+      const clean = link.split("#")[0];
+      if (!clean) continue;
+      const target = resolve(file, "..", clean);
+      if (!existsSync(target)) fail(`broken link: ${relative(root, file)} -> ${link}`);
+    }
+  }
+}
+
+function checkData() {
+  const dataFiles = ["profiles.json", "styles.json", "types.json", "palettes.json", "motion.json", "stacks.json", "quality-gates.json", "resources.json", "reference-lenses.json", "reference-recipes.json", "reference-sources.json", "visual-directions.json", "visual-treatments.json", "constraint-policy.json"];
+  const datasets = {};
+  for (const file of dataFiles) {
+    const path = join(root, "data", file);
+    try {
+      const data = readJson(path);
+      datasets[file] = data;
+      const collection = Object.values(data).find((value) => Array.isArray(value));
+      if (!collection || collection.length === 0) fail(`empty dataset: data/${file}`);
+      const ids = collection?.map((item) => item.id) ?? [];
+      if (new Set(ids).size !== ids.length) fail(`duplicate dataset id: data/${file}`);
+    } catch (error) {
+      fail(`invalid JSON: data/${file}: ${error.message}`);
+    }
+  }
+  const ids = (file, key) => new Set((datasets[file]?.[key] ?? []).map((item) => item.id));
+  const styleIds = ids("styles.json", "styles");
+  const typeIds = ids("types.json", "types");
+  const paletteIds = ids("palettes.json", "palettes");
+  const motionIds = ids("motion.json", "motions");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "asset-readiness")) fail("quality gates are missing asset-readiness");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "premium-finish")) fail("quality gates are missing premium-finish");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "reference-fidelity")) fail("quality gates are missing reference-fidelity");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "visual-direction")) fail("quality gates are missing visual-direction");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "geometry-language")) fail("quality gates are missing geometry-language");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "constraint-authority")) fail("quality gates are missing constraint-authority");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "product-signal")) fail("quality gates are missing product-signal");
+  if (!(datasets["quality-gates.json"]?.qualityGates ?? []).some((gate) => gate.id === "surface-completeness")) fail("quality gates are missing surface-completeness");
+  if (!(datasets["quality-gates.json"]?.antiPatterns ?? []).some((item) => item.id === "presentation-shell")) fail("quality gates are missing presentation-shell rejection");
+  if (!(datasets["quality-gates.json"]?.antiPatterns ?? []).some((item) => item.id === "first-viewport-only")) fail("quality gates are missing first-viewport-only rejection");
+  if (!(datasets["quality-gates.json"]?.antiPatterns ?? []).some((item) => item.id === "unfinished-surface")) fail("quality gates are missing unfinished-surface rejection");
+  if (!(datasets["constraint-policy.json"]?.hardInvariants ?? []).some((item) => item.id === "semantic-accessibility")) fail("constraint policy is missing semantic-accessibility");
+  if (!(datasets["constraint-policy.json"]?.advisoryDefaults ?? []).some((item) => item.id === "ai-default-composition")) fail("constraint policy is missing advisory AI-default composition policy");
+  if (!(datasets["constraint-policy.json"]?.advisoryDefaults ?? []).some((item) => item.id === "default-soft-geometry")) fail("constraint policy is missing the default soft-geometry policy");
+  if (!ids("styles.json", "styles").has("quiet-luxury")) fail("styles are missing quiet-luxury");
+  for (const profile of datasets["profiles.json"]?.profiles ?? []) {
+    for (const [field, set] of [["stance", styleIds], ["type", typeIds], ["palette", paletteIds], ["motion", motionIds]]) {
+      if (!set.has(profile[field])) fail(`profile ${profile.id} references missing ${field}: ${profile[field]}`);
+    }
+  }
+  for (const style of datasets["styles.json"]?.styles ?? []) {
+    for (const profileId of style.bestFor ?? []) {
+      if (!(datasets["profiles.json"]?.profiles ?? []).some((profile) => profile.id === profileId)) {
+        fail(`style ${style.id} references missing profile: ${profileId}`);
+      }
+    }
+  }
+  for (const reference of datasets["reference-lenses.json"]?.references ?? []) {
+    if (!reference.url || !/^https?:\/\//.test(reference.url)) fail(`reference ${reference.id} has no valid URL`);
+    if (!Array.isArray(reference.roles) || reference.roles.length === 0) fail(`reference ${reference.id} has no roles`);
+    if (!Array.isArray(reference.borrow) || reference.borrow.length === 0) fail(`reference ${reference.id} has no borrow guidance`);
+    if (!Array.isArray(reference.reject) || reference.reject.length === 0) fail(`reference ${reference.id} has no reject guidance`);
+    if (!reference.visual?.family || !reference.visual?.motion) fail(`reference ${reference.id} has incomplete visual lens data`);
+  }
+  const lensIds = new Set((datasets["reference-lenses.json"]?.references ?? []).map((reference) => reference.id));
+  for (const recipe of datasets["reference-recipes.json"]?.recipes ?? []) {
+    if (!lensIds.has(recipe.referenceId)) fail(`recipe ${recipe.referenceId} has no matching reference lens`);
+    if (!recipe.archetype || !recipe.firstViewport || !Array.isArray(recipe.sections) || recipe.sections.length === 0) fail(`recipe ${recipe.referenceId} is incomplete`);
+    if (!recipe.motionContract?.review || !recipe.motionContract?.fallback) fail(`recipe ${recipe.referenceId} has incomplete motion contract`);
+    if (!recipe.tokenSeed?.canvas || !recipe.tokenSeed?.radius || !recipe.tokenSeed?.spacing || !recipe.tokenSeed?.type) fail(`recipe ${recipe.referenceId} has incomplete token seed`);
+  }
+  for (const source of datasets["reference-sources.json"]?.sources ?? []) {
+    if (!source.sourceType || !Number.isFinite(source.qualityTier)) fail(`reference source ${source.id} has incomplete provenance`);
+    if (!Array.isArray(source.urls) || source.urls.length === 0 || source.urls.some((url) => !/^https?:\/\//.test(url))) fail(`reference source ${source.id} has invalid URLs`);
+    if (!Array.isArray(source.roles) || source.roles.length === 0 || !Array.isArray(source.borrow) || source.borrow.length === 0 || !Array.isArray(source.reject) || source.reject.length === 0) fail(`reference source ${source.id} has incomplete decision guidance`);
+  }
+  for (const direction of datasets["visual-directions.json"]?.directions ?? []) {
+    if (!direction.label || !direction.signature) fail(`visual direction ${direction.id} has no label/signature`);
+    if (!direction.firstViewport?.layout || !direction.firstViewport?.alignmentAxis || !direction.firstViewport?.dominant) fail(`visual direction ${direction.id} has incomplete first viewport contract`);
+    if (!direction.typeRules?.title || !direction.typeRules?.hierarchy) fail(`visual direction ${direction.id} has incomplete type rules`);
+    if (!direction.spacingRules?.rhythm || !direction.surfaceRules?.cardBudget) fail(`visual direction ${direction.id} has incomplete spacing/surface rules`);
+    if (!direction.geometryRules?.edgeCharacter || !direction.geometryRules?.cornerHierarchy || !direction.geometryRules?.separation || !direction.geometryRules?.linePolicy || !direction.geometryRules?.sharpException) fail(`visual direction ${direction.id} has incomplete geometry rules`);
+    if (!Array.isArray(direction.antiAiChecks) || direction.antiAiChecks.length < 3) fail(`visual direction ${direction.id} has too few AI-default checks`);
+    if (!Array.isArray(direction.renderChecks) || direction.renderChecks.length < 2) fail(`visual direction ${direction.id} has too few render checks`);
+  }
+  const directionIds = ids("visual-directions.json", "directions");
+  const profileIds = ids("profiles.json", "profiles");
+  const treatmentStyleIds = ids("styles.json", "styles");
+  for (const treatment of datasets["visual-treatments.json"]?.treatments ?? []) {
+    if (!treatment.label || !treatment.signature || !treatment.palette || !treatment.typography || !treatment.composition || !treatment.geometry) fail(`visual treatment ${treatment.id} is incomplete`);
+    if (!Array.isArray(treatment.directionIds) || treatment.directionIds.some((id) => !directionIds.has(id))) fail(`visual treatment ${treatment.id} references a missing direction`);
+    if (!Array.isArray(treatment.profileIds) || treatment.profileIds.some((id) => !profileIds.has(id))) fail(`visual treatment ${treatment.id} references a missing profile`);
+    if (!Array.isArray(treatment.styleIds) || treatment.styleIds.some((id) => !treatmentStyleIds.has(id))) fail(`visual treatment ${treatment.id} references a missing style`);
+    if (!Array.isArray(treatment.antiAiChecks) || treatment.antiAiChecks.length < 3) fail(`visual treatment ${treatment.id} has too few AI-default checks`);
+    if (!Array.isArray(treatment.renderChecks) || treatment.renderChecks.length < 2) fail(`visual treatment ${treatment.id} has too few render checks`);
+  }
+}
+
+function checkScripts() {
+  const scripts = walkFiles(join(root, "scripts")).filter((file) => file.endsWith(".mjs"));
+  scripts.push(join(root, "bin", "frontend-art-direction.js"));
+  for (const script of scripts) {
+    try {
+      execFileSync(process.execPath, ["--check", script], { stdio: "pipe" });
+    } catch (error) {
+      fail(`syntax error: ${relative(root, script)}: ${error.stderr?.toString().trim() || error.message}`);
+    }
+  }
+}
+
+function checkPackage() {
+  const packageJson = readJson(join(root, "package.json"));
+  for (const required of ["SKILL.md", "README.md", "agents", "bin", "scripts", "data", "references", "templates", "docs"]) {
+    if (!packageJson.files.includes(required)) fail(`package.files does not include ${required}`);
+  }
+  if (packageJson.type !== "module") fail("package.json must use type=module");
+  if (!packageJson.scripts?.test) fail("package.json is missing the test script");
+  for (const script of ["graph", "brief", "product-context", "direction", "reference", "scout", "reference-build", "resource", "audit", "motion", "surface-mode", "design-operation", "design-loop", "research-atlas", "live", "image-proposal", "critique", "visual-lint", "capture"]) {
+    if (!packageJson.scripts?.[script]) fail(`package.json is missing the ${script} script`);
+  }
+}
+
+function checkSkill() {
+  const skill = readFileSync(join(root, "SKILL.md"), "utf8");
+  const frontmatter = parseFrontmatter(skill);
+  if (!frontmatter) fail("SKILL.md is missing YAML frontmatter");
+  if (!/^name:\s*frontend-art-direction/m.test(frontmatter ?? "")) fail("SKILL.md frontmatter has no name");
+  if (!/^description:\s*.+/m.test(frontmatter ?? "")) fail("SKILL.md frontmatter has no description");
+  const lines = skill.split("\n").length;
+  if (lines > 220) fail(`SKILL.md is too large (${lines} lines; keep the router small)`);
+  if (/TODO|TBD|your text here|lorem ipsum/i.test(skill)) fail("SKILL.md contains unfinished placeholder text");
+  if (!skill.includes("Asset priority is user-provided")) fail("SKILL.md is missing the default asset policy");
+}
+
+async function checkSmoke() {
+  try {
+    const report = scanProject(root, { maxFiles: 5000 });
+    if (!report.stack.frameworks.includes("vite") && !report.stack.frameworks.includes("react")) {
+      notes.push("repository itself is a skill package, so its scan has no frontend framework signal");
+    }
+    const brief = buildBrief({ query: "analytics dashboard for operators", projectRoot: root });
+    const map = mapProject(root, "where is the package test script", { limit: 5 });
+    const graph = buildProjectGraph(root);
+    const graphQuery = queryProjectGraph(graph, "motion adapter design brief", { limit: 5 });
+    const resources = queryResources("modal transition cleanup", { stack: "react", limit: 4 });
+    const rewampResources = queryResources("Rewamp UI component workbench", { stack: "react", limit: 4 });
+    const genericResources = queryResources("我要一个网站", { limit: 8 });
+    const references = selectReferenceComposition("AI agent dashboard with approval modal", {
+      profile: "agent workspace",
+      style: "instrument panel",
+      motion: "modal continuity",
+      limit: 4,
+    });
+    const microReferences = selectReferenceComposition("polish the button hover micro-interaction", { limit: 4 });
+    const rewampReferences = selectReferenceComposition("build a searchable component workbench like Rewamp UI", { limit: 4 });
+    const noReference = selectReferenceComposition("我要一个网站");
+    const transactionBrief = buildBrief({ query: "商品支付与订单流程" });
+    const genericBrief = buildBrief({ query: "我要一个网站" });
+    const narrativeBrief = buildBrief({ query: "实验性品牌叙事网页" });
+    const editorialBrief = buildBrief({ query: "editorial photography website" });
+    const brandToolBrief = buildBrief({ query: "brand design editor tool" });
+    if ([narrativeBrief, editorialBrief].some((item) => item.productSignal.mode !== "authored-experience" || item.productSignal.primaryAction !== null)) fail("local profile fallback overrode an explicit authored intent");
+    if (brandToolBrief.productSignal.mode !== "product" || !brandToolBrief.productSignal.primaryAction) fail("authored vocabulary removed the workflow from an explicit tool request");
+    const genericScout = scoutReferences("我要一个网站");
+    const hardwareScout = scoutReferences("高端硬件外设官网", { limit: 4 });
+    const hardwareBrief = buildBrief({ query: "高端硬件外设官网" });
+    const premiumBrief = buildBrief({ query: "高端品牌官网，要求有质感" });
+    const genericDirection = selectVisualDirection("我要一个网站", { adaptiveDefault: true });
+    const hardwareDirection = selectVisualDirection("premium keyboard and mouse product website", { profile: "hardware-product-story" });
+    const analyticsDirection = selectVisualDirection("analytics dashboard", { profile: "data-workbench" });
+    const agentDirection = selectVisualDirection("AI agent dashboard with approval modal", { profile: "productive-app" });
+    const galleryDirection = selectVisualDirection("component gallery like Rare UI", { reference: "rare-ui" });
+    const rewampDirection = selectVisualDirection("searchable component workbench like Rewamp UI", { reference: "rewamp-ui" });
+    const companyDirection = selectVisualDirection("公司官网", { profile: "editorial-marketing", style: "editorial-authority" });
+    const projectOwnedDirection = selectVisualDirection("内部品牌工作台", {
+      project: {
+        designAuthority: {
+          exists: true,
+          path: "DESIGN.md",
+          authority: "project-owned",
+          confidence: "high",
+          hasDirectionContract: true,
+        },
+      },
+    });
+    const inspectedReferenceDirection = selectVisualDirection("component gallery like Rare UI", {
+      reference: "rare-ui",
+      referenceInspected: true,
+    });
+    const modelDirection = selectVisualDirection("experimental editorial interface", {
+      authority: "model",
+      modelProposal: true,
+      creativeDirection: "A sparse, typographic, intentionally asymmetric reading instrument.",
+    });
+    const readMode = classifySurfaceMode("a documentation page for a research report");
+    const operateMode = classifySurfaceMode("an editor for configuring components");
+    const adaptiveMode = classifySurfaceMode("我要一个网站");
+    const layoutOperation = resolveDesignOperation("现在太方正，排版没有质感");
+    const vagueOperation = resolveDesignOperation("帮我优化一下");
+    const colorOperation = resolveDesignOperation("这个页面太灰，配色很单调");
+    const auditOperation = resolveDesignOperation("audit contrast and accessibility");
+    const delightOperation = resolveDesignOperation("make the interaction more memorable");
+    const extractOperation = resolveDesignOperation("extract the repeated tokens and components");
+    if (readMode.mode !== "read" || operateMode.mode !== "operate" || adaptiveMode.mode !== "adaptive") fail("surface mode routing lost per-surface or adaptive behavior");
+    if (layoutOperation.operation !== "layout" || vagueOperation.directionQuestion === null) fail("design operation routing did not separate explicit and vague feedback");
+    if (colorOperation.operation !== "colorize" || auditOperation.operation !== "audit" || delightOperation.operation !== "delight" || extractOperation.operation !== "extract") fail("design operation routing did not expose the Impeccable action vocabulary");
+    const liveFixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-live-"));
+    try {
+      mkdirSync(join(liveFixture, "artifacts"), { recursive: true });
+      for (const capture of ["baseline", "variant-1", "variant-2", "after"]) writeFileSync(join(liveFixture, "artifacts", `${capture}.png`), syntheticPng);
+      writeFileSync(join(liveFixture, "artifacts", "variant-1.diff"), "source diff\n");
+      const live = createLiveSession({ projectRoot: liveFixture, query: "polish an editor panel", url: "http://localhost:5173", target: "[data-target]" });
+      const baseline = recordLiveEvent({ projectRoot: liveFixture, session: live.session.id, kind: "baseline", path: "artifacts/baseline.png" });
+      const variant = addLiveVariant({ projectRoot: liveFixture, session: live.session.id, id: "variant-1", path: "artifacts/variant-1.png", summary: "Tighter panel hierarchy" });
+      addLiveVariant({ projectRoot: liveFixture, session: live.session.id, id: "variant-2", path: "artifacts/variant-2.png", summary: "More open stage" });
+      const accepted = decideLiveVariant({ projectRoot: liveFixture, session: live.session.id, variant: "variant-1", decision: "accept", sourceDiff: "artifacts/variant-1.diff", path: "artifacts/after.png" });
+      recordLiveEvent({ projectRoot: liveFixture, session: live.session.id, kind: "after", path: "artifacts/after.png" });
+      const closedLive = closeLiveSession({ projectRoot: liveFixture, session: live.session.id });
+      if (baseline.evidence.length !== 1 || variant.variants.length !== 1 || accepted.status !== "accepted-awaiting-proof" || accepted.decision.variant !== "variant-1" || closedLive.status !== "complete" || !closedLive.proof?.baseline?.valid || !closedLive.proof?.after?.valid) fail("live iteration session did not enforce and close the rendered acceptance protocol");
+    } finally {
+      rmSync(liveFixture, { recursive: true, force: true });
+    }
+    const imageFixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-image-proposal-"));
+    try {
+      mkdirSync(join(imageFixture, "artifacts"), { recursive: true });
+      for (const capture of ["baseline", "proposal", "after"]) writeFileSync(join(imageFixture, "artifacts", `${capture}.png`), syntheticPng);
+      writeFileSync(join(imageFixture, "artifacts", "translation.diff"), "source translation\n");
+      const imageSession = createImageProposalSession({ projectRoot: imageFixture, query: "make the field stage more authored", gap: "the first viewport is visually even" });
+      const imageBaseline = recordImageEvidence({ projectRoot: imageFixture, session: imageSession.session.id, kind: "baseline", path: "artifacts/baseline.png", notes: "Real browser baseline" });
+      const imageProposal = addImageProposal({ projectRoot: imageFixture, session: imageSession.session.id, id: "field-stage", path: "artifacts/proposal.png", prompt: "Keep the field subject and create a more authored stage.", summary: "A stronger stage silhouette with a clear visual counterweight.", inputs: "baseline-screenshot,reference", preserve: "subject,content,working controls" });
+      const imageSelected = decideImageProposal({ projectRoot: imageFixture, session: imageSession.session.id, proposal: "field-stage", decision: "select" });
+      const imageTranslated = translateImageProposal({ projectRoot: imageFixture, session: imageSession.session.id, sourceDiff: "artifacts/translation.diff", delta: "Rebuilt the stage silhouette and translated the proposal into CSS and real assets." });
+      const imageAfter = recordImageEvidence({ projectRoot: imageFixture, session: imageSession.session.id, kind: "after", path: "artifacts/after.png", notes: "Actual target recapture" });
+      const closedImage = closeImageProposalSession({ projectRoot: imageFixture, session: imageSession.session.id });
+      if (!imageBaseline.baseline?.valid || imageProposal.proposals.length !== 1 || imageSelected.status !== "selected-awaiting-translation" || imageTranslated.status !== "translated-awaiting-capture" || imageAfter.status !== "ready-to-close" || closedImage.status !== "complete" || !closedImage.proof?.proposal?.valid || !closedImage.proof?.after?.valid) fail("image proposal session did not enforce and close the proposal-to-code proof protocol");
+    } finally {
+      rmSync(imageFixture, { recursive: true, force: true });
+    }
+    const critiqueFixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-visual-critique-"));
+    try {
+      mkdirSync(join(critiqueFixture, "artifacts"), { recursive: true });
+      for (const capture of ["current", "reference"]) writeFileSync(join(critiqueFixture, "artifacts", `${capture}.png`), syntheticPng);
+      const critiqueSession = createVisualCritiqueSession({ projectRoot: critiqueFixture, query: "make the stage less generic", capture: "artifacts/current.png", reference: "artifacts/reference.png", viewport: "1440x900", state: "default", round: "19" });
+      const finding = addVisualFinding({ projectRoot: critiqueFixture, session: critiqueSession.session.id, id: "stage-dominance", severity: "P1", region: "hero stage / desktop", observation: "The subject stage has no visual dominance over the supporting copy.", consequence: "The first glance reads as a generic layout instead of a subject-led surface.", evidence: "artifacts/current.png", repair: "Widen the stage and reduce the supporting panel's contrast.", confidence: "render-certain", status: "resolved" });
+      const verdict = recordVisualVerdict({ projectRoot: critiqueFixture, session: critiqueSession.session.id, verdict: "CURRENT WINS", largestGap: "The original stage was too evenly weighted.", nextOperation: "Recheck the mobile stage crop after the desktop repair.", regressionCheck: "Compare the same route at 390x844 and exercise the trace state." });
+      const closedCritique = closeVisualCritiqueSession({ projectRoot: critiqueFixture, session: critiqueSession.session.id });
+      if (finding.findings.length !== 1 || verdict.status !== "verdict-ready" || closedCritique.status !== "complete" || closedCritique.proof?.verdict !== "CURRENT WINS") fail("visual critique journal did not enforce and close the structured fresh-eyes protocol");
+    } finally {
+      rmSync(critiqueFixture, { recursive: true, force: true });
+    }
+    const lintFixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-visual-lint-"));
+    try {
+      writeFileSync(join(lintFixture, "App.css"), `body { font-family: Inter, sans-serif; transition: all 200ms; animation: float 2s; color: #000; background: #fff; box-shadow: 0 0 2px #000; }\n`);
+      writeFileSync(join(lintFixture, "App.jsx"), `<button>placeholder text</button>\n`);
+      const lint = lintProject(lintFixture);
+      if (lint.status !== "completed-with-findings" || !lint.findings.some((item) => item.rule === "placeholder-content") || !lint.findings.some((item) => item.rule === "motion-without-reduced-motion") || !lint.findings.some((item) => item.rule === "interactive-focus")) fail("visual lint did not surface deterministic source findings");
+    } finally {
+      rmSync(lintFixture, { recursive: true, force: true });
+    }
+    const authoredDirection = selectVisualDirection("a reading tool for field notes", {
+      authoredDirection: {
+        id: "folded-field",
+        label: "Folded Field",
+        signature: "A continuous reading field carries the object across a clipped index.",
+        rationale: "The product is a sequence of evidence, so the page should unfold around the artifact.",
+        firstViewport: {
+          layout: "A continuous off-axis reading field with an attached index.",
+          alignmentAxis: "The artifact edge and index share a vertical datum.",
+          dominant: "The real artifact.",
+          counterweight: "A compact index.",
+          belowFoldPeek: "The next artifact enters as a continuation.",
+        },
+        geometryRules: {
+          edgeCharacter: "Soft folded surfaces.",
+          cornerHierarchy: "Field broad, index tighter, controls compact.",
+          separation: "Fold, crop, tone, whitespace before borders.",
+          linePolicy: "Short index marks only.",
+          sharpException: "Exact sequence marks may stay sharp.",
+        },
+        build: {
+          buildOrder: ["artifact field", "attached index"],
+          acceptance: ["artifact reads before explanation"],
+        },
+      },
+    });
+    const authorityFixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-authority-"));
+    try {
+      writeFileSync(join(authorityFixture, "DESIGN.md"), `# DESIGN.md\n\n## Direction\n- Design stance: brutalist editorial instrument\n- Signature move: oversized index and hard rules\n- What is intentionally not used: soft cards\n`);
+      const scannedAuthority = scanProject(authorityFixture);
+      const scannedDirection = selectVisualDirection("内部工作台", { project: scannedAuthority });
+      if (scannedAuthority.designAuthority?.path !== "DESIGN.md" || scannedAuthority.designAuthority?.confidence !== "high") fail("inspect did not detect the project-owned DESIGN.md authority");
+      if (scannedDirection.constraintAuthority?.mode !== "project-owned" || scannedDirection.constraintAuthority?.projectDesign?.fields?.["design-stance"] !== "brutalist editorial instrument") fail("scanned DESIGN.md authority was not carried into the direction contract");
+    } finally {
+      rmSync(authorityFixture, { recursive: true, force: true });
+    }
+    const referenceBuild = buildReferenceBuild({
+      query: "Build a component gallery for our analytics SDK like Rare UI",
+      projectRoot: root,
+    });
+    const authoredBuild = buildReferenceBuild({
+      query: "Build a reading tool for field notes",
+      authoredDirection: {
+        id: "folded-field",
+        label: "Folded Field",
+        signature: "A continuous reading field carries the object across a clipped index.",
+        rationale: "The product is a sequence of evidence, so the page should unfold around the artifact.",
+        firstViewport: {
+          layout: "A continuous off-axis reading field with an attached index.",
+          alignmentAxis: "The artifact edge and index share a vertical datum.",
+          dominant: "The real artifact.",
+          counterweight: "A compact index.",
+          belowFoldPeek: "The next artifact enters as a continuation.",
+        },
+      },
+    });
+    const magicBuild = buildReferenceBuild({
+      query: "Build a high-impact landing block like Magic UI",
+    });
+    const rewampBuild = buildReferenceBuild({
+      query: "Build a searchable component workbench like Rewamp UI",
+    });
+    const externalBuild = buildReferenceBuild({
+      query: "Build a product like https://example.com/visual-tool for our workflow",
+    });
+    const audit = await buildAudit({ projectRoot: root, query: "analytics dashboard", offline: true, limit: 4 });
+    const referenceAudit = await buildAudit({ projectRoot: root, query: "Build a component gallery like Rare UI", offline: true, limit: 4 });
+    const hardwareAudit = await buildAudit({ projectRoot: root, query: "高端硬件外设类网站", offline: true, limit: 4 });
+    const motionAudit = await buildAudit({ projectRoot: root, query: "modal transition cleanup", motion: true, offline: true, limit: 4 });
+    const designLoop = buildDesignLoop({ query: "analytics dashboard with loading and empty states" });
+    const loopFixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-loop-"));
+    try {
+      const createdLoop = createDesignLoopSession({ projectRoot: loopFixture, query: "rebuild a research dashboard" });
+      let loopSession = createdLoop.session;
+      mkdirSync(join(loopFixture, "artifacts"), { recursive: true });
+      writeFileSync(join(loopFixture, "artifacts", "reference-inspection.md"), "Inspected the primary reference at desktop and mobile; recorded strengths, weaknesses, and rejected traits.\n");
+      const atlasId = createdLoop.session.researchAtlas.id;
+      let rejectedMissingReferenceEvidence = false;
+      try {
+        addResearchAtlasReference({ projectRoot: loopFixture, session: atlasId, id: "missing-evidence", label: "Unproven selected reference", status: "selected" });
+      } catch (error) {
+        rejectedMissingReferenceEvidence = /local capture or research artifact/u.test(error.message);
+      }
+      if (!rejectedMissingReferenceEvidence) fail("research atlas accepted a selected reference without local evidence");
+      addResearchAtlasReference({
+        projectRoot: loopFixture,
+        session: atlasId,
+        id: "primary-reference",
+        label: "Primary inspected reference",
+        url: "https://example.com/reference",
+        kind: "user",
+        status: "selected",
+        role: "visual language",
+        evidence: "artifacts/reference-inspection.md",
+        strengths: "clear hierarchy,subject-specific material",
+        weaknesses: "brand-specific navigation",
+        borrow: "object-led sequence",
+        reject: "copying the shell",
+      });
+      for (const section of ATLAS_SECTIONS) {
+        recordResearchAtlasSection({
+          projectRoot: loopFixture,
+          session: atlasId,
+          section: section.id,
+          winner: "primary-reference",
+          decision: `${section.id} decision`,
+          evidence: "artifacts/reference-inspection.md",
+        });
+      }
+      recordResearchAtlasSkill({ projectRoot: loopFixture, session: atlasId, id: "frontend-visual-qa", status: "selected" });
+      recordResearchAtlasSkill({ projectRoot: loopFixture, session: atlasId, id: "browser-capture", status: "unavailable", reason: "No browser adapter in this package-level smoke fixture" });
+      recordResearchAtlasSynthesis({
+        projectRoot: loopFixture,
+        session: atlasId,
+        direction: "A research surface led by the actual evidence object",
+        visualLanguage: "quiet field with one high-contrast instrument",
+        composition: "asymmetric stage with a narrow evidence rail",
+        type: "display title with compact reading text",
+        material: "soft structural surfaces and deliberate crops",
+        motion: "state-bound reveal with static final state",
+        assets: "real capture and subject-specific diagrams",
+        templateRisk: "Do not collapse into an equal-card dashboard",
+        gaps: "actual content needs product-owner confirmation",
+        rejectedDefaults: "generic hero, decorative gradient blobs",
+      });
+      const closedAtlas = closeResearchAtlas({ projectRoot: loopFixture, session: atlasId });
+      if (closedAtlas.status !== "complete" || !renderResearchAtlas(closedAtlas).includes("Section Winners")) fail("research atlas did not close with section winners and synthesis");
+      for (let round = 1; round <= 19; round += 1) {
+        writeFileSync(join(loopFixture, "artifacts", `round-${round}.md`), `round ${round}\n`);
+        const evidence = [`artifacts/round-${round}.md`];
+        const visualFields = {};
+        if (round === 15) {
+          let rejectedWithoutCapture = false;
+          try {
+            recordDesignLoopRound({ projectRoot: loopFixture, session: loopSession.id, round, decision: "missing capture should fail", evidence: "artifacts/round-15.md", proof: "desktop-capture" });
+          } catch (error) {
+            rejectedWithoutCapture = /local screenshot or media capture/u.test(error.message);
+          }
+          if (!rejectedWithoutCapture) fail("design loop accepted a visual round without a local capture");
+          writeFileSync(join(loopFixture, "artifacts", "invalid-capture.png"), "this is not a PNG\n");
+          let rejectedInvalidCapture = false;
+          try {
+            recordDesignLoopRound({ projectRoot: loopFixture, session: loopSession.id, round, decision: "invalid capture should fail", evidence: "artifacts/invalid-capture.png", proof: "desktop-capture" });
+          } catch (error) {
+            rejectedInvalidCapture = /local screenshot or media capture/u.test(error.message);
+          }
+          if (!rejectedInvalidCapture) fail("design loop accepted a non-media capture file");
+        }
+        if (round >= 15) {
+          writeFileSync(join(loopFixture, "artifacts", `round-${round}.png`), syntheticPng);
+          evidence.push(`artifacts/round-${round}.png`);
+        }
+        if (round >= 16) {
+          if (round === 16) {
+            let rejectedWithoutComparison = false;
+            try {
+              recordDesignLoopRound({ projectRoot: loopFixture, session: loopSession.id, round, decision: "missing comparison should fail", evidence: "artifacts/round-16.png", proof: "desktop-capture", largestGap: "the visual hierarchy is too even", repair: "rebalance the dominant object" });
+            } catch (error) {
+              rejectedWithoutComparison = /before-and-after capture evidence/u.test(error.message);
+            }
+            if (!rejectedWithoutComparison) fail("design loop accepted a repair round without before-and-after capture evidence");
+          }
+          writeFileSync(join(loopFixture, "artifacts", `round-${round}-before.png`), syntheticPng);
+          evidence.unshift(`artifacts/round-${round}-before.png`);
+          visualFields.largestGap = `largest gap in round ${round}`;
+          visualFields.repair = `repair applied in round ${round}`;
+          writeFileSync(join(loopFixture, "artifacts", `round-${round}-comparison.md`), `before and after comparison ${round}\n`);
+          visualFields.comparison = `artifacts/round-${round}-comparison.md`;
+          if (round === 19) {
+            const critique = createVisualCritiqueSession({ projectRoot: loopFixture, query: "fresh-eyes loop smoke", capture: "artifacts/round-19.png", reference: "artifacts/round-19-before.png", viewport: "1440x900", round: "19" });
+            addVisualFinding({ projectRoot: loopFixture, session: critique.session.id, id: "loop-hierarchy", severity: "P1", region: "full surface", observation: "The first render gives equal weight to the subject and support copy.", consequence: "The intended hierarchy is hard to read at a glance.", evidence: "artifacts/round-19.png", repair: "Widened the subject stage and reduced support contrast.", confidence: "render-certain", status: "resolved" });
+            recordVisualVerdict({ projectRoot: loopFixture, session: critique.session.id, verdict: "CURRENT WINS", largestGap: "The first render was too evenly weighted.", nextOperation: "Recheck the mobile crop.", regressionCheck: "Compare the same state at the target mobile viewport." });
+            closeVisualCritiqueSession({ projectRoot: loopFixture, session: critique.session.id });
+            visualFields.critique = relative(loopFixture, critique.path).split("\\").join("/");
+          }
+        }
+        if (round === 19) visualFields.verdict = "CURRENT WINS";
+        loopSession = recordDesignLoopRound({ projectRoot: loopFixture, session: loopSession.id, round, decision: `round ${round} decision`, evidence: evidence.join(","), proof: round >= 15 ? "desktop-capture" : "decision", ...visualFields });
+      }
+      writeFileSync(join(loopFixture, "artifacts", "signoff.md"), "signoff\n");
+      writeFileSync(join(loopFixture, "artifacts", "signoff.png"), syntheticPng);
+      loopSession = recordDesignLoopRound({ projectRoot: loopFixture, session: loopSession.id, round: 20, decision: "all gates pass", evidence: "artifacts/signoff.md,artifacts/signoff.png", proof: "static,runtime,visual,accessibility,scope", score: "8", verdict: "CURRENT WINS", largestGap: "no material gap remains", repair: "completed the final documented repair", dimensions: "subject-fit=8,hierarchy=8,composition=8,type-and-content=8,material-and-assets=8,interaction-and-motion=8,responsive-and-states=8,originality=8,completion-and-proof=8" });
+      const closedLoop = closeDesignLoopSession({ projectRoot: loopFixture, session: loopSession.id });
+      if (closedLoop.status !== "complete" || getDesignLoopSession({ projectRoot: loopFixture, session: loopSession.id }).currentRound !== 21) fail("design loop session did not enforce and close the 20-round evidence contract");
+    } finally {
+      rmSync(loopFixture, { recursive: true, force: true });
+    }
+    if (!brief.recommendation.profile?.id || !brief.recommendation.motion?.id) fail("brief smoke output is incomplete");
+    if (designLoop.rounds !== 20 || designLoop.roundsDetail.length !== 20 || designLoop.roundsDetail.at(-1)?.id !== "signoff" || !renderDesignLoop(designLoop).includes("20-Round Design Production Loop")) fail("design production loop smoke output is incomplete");
+    if (!brief.productSignal?.object || !brief.productSignal?.primaryAction || !brief.productSignal?.visibleResult || !brief.completionContract?.requirements?.length || !brief.quality.gates.some((gate) => gate.id === "product-signal") || !brief.quality.gates.some((gate) => gate.id === "surface-completeness") || !brief.quality.antiPatterns.some((item) => item.id === "presentation-shell")) fail("brief did not expose the product and completion contracts");
+    if (!map.results.some((item) => item.path === "package.json")) fail("project map did not rank package.json for a package query");
+    if (graph.scan.graphNodes === 0 || graph.scan.graphEdges === 0) fail("project graph smoke output is empty");
+    if (graphQuery.results.length === 0) fail("project graph query returned no results");
+    if (resources.candidates.length === 0) fail("resource catalog smoke output is empty");
+    if (!rewampResources.candidates.some((item) => item.id === "rewamp-ui-components")) fail("resource catalog did not route the named Rewamp UI component source");
+    if (genericResources.candidates.length !== 1 || genericResources.candidates[0].id !== "local-primitives") fail("underspecified resource query ranked unrelated dependencies");
+    if (references.selected.length < 2 || references.selected.length > 4) fail("reference composition did not respect the 2-4 lens budget");
+    if (new Set(references.selected.map((item) => item.id)).size !== references.selected.length) fail("reference composition selected duplicate lenses");
+    if (references.selected.some((item) => item.borrow.length === 0 || item.reject.length === 0 || !item.translate)) fail("reference composition guidance is incomplete");
+    if (!microReferences.requiredRoles.some((role) => role.id === "micro-interaction") || !microReferences.selected.some((item) => ["bencho", "design-spells", "react-bits", "obsidian-ui"].includes(item.id))) fail("micro-interaction reference routing is incomplete");
+    if (!rewampReferences.selected.some((item) => item.id === "rewamp-ui")) fail("reference composition did not route the named Rewamp UI workbench lens");
+    if (noReference.mode !== "no-reference-default" || noReference.selected.length !== 0) fail("no-reference mode forced an external visual lens");
+    if (transactionBrief.recommendation.profile.id !== "commerce-flow" || transactionBrief.recommendation.style.id !== "visual-object") fail("explicit transaction matching did not resolve the commerce profile");
+    if (transactionBrief.referenceComposition.selected.some((item) => ["rare-ui", "beautiful-ui", "beui"].includes(item.id))) fail("transaction brief imported a visual showcase lens");
+    if (genericBrief.directionMode !== "adaptive-default" || genericBrief.recommendation.profile.id !== "adaptive-surface" || genericBrief.recommendation.style.id !== "evidence-led-neutral") fail("underspecified request did not resolve the adaptive default");
+    if (genericBrief.referenceComposition.selected.length !== 0 || genericBrief.referenceScout.active) fail("underspecified request forced a reference or product category");
+    if (genericScout.active || genericScout.selected.length !== 0) fail("generic request activated the product reference scout without category evidence");
+    if (!hardwareScout.active || !hardwareScout.selected.some((item) => item.id === "apple-product")) fail("hardware reference scout did not return a global official benchmark");
+    if (hardwareBrief.recommendation.profile.id !== "hardware-product-story" || hardwareBrief.recommendation.style.id !== "premium-industrial") fail("hardware request did not resolve the hardware product direction");
+    if (premiumBrief.recommendation.style.id !== "quiet-luxury" || premiumBrief.recommendation.palette.id !== "tonal-studio" || !premiumBrief.quality.gates.some((gate) => gate.id === "premium-finish")) fail("premium request did not resolve the premium finish direction");
+    const acceptedConceptDirection = selectVisualDirection("我要一个网站", { concept: "object-story" });
+    const ordinaryConceptDirection = selectVisualDirection("company website");
+    const dataConceptDirection = selectVisualDirection("analytics dashboard");
+    if (genericDirection.id !== "adaptive-asymmetric" || genericDirection.mode !== "adaptive" || genericDirection.visualTreatment?.id !== "quiet-editorial-studio" || genericDirection.visualTreatment?.confidence !== "provisional" || genericDirection.constraintAuthority?.mode !== "adaptive-default" || !genericDirection.constraintAuthority?.canOverrideAdvisory || genericDirection.constraintAuthority?.creativeFreedom !== "open-with-proof" || genericDirection.conceptSet?.status !== "selection-required" || genericDirection.conceptSet?.candidates?.length !== 3 || new Set(genericDirection.conceptSet.candidates.map((item) => item.directionId)).size !== 3 || acceptedConceptDirection.selectionStatus !== "accepted-concept" || acceptedConceptDirection.id !== "object-led-editorial" || acceptedConceptDirection.visualTreatment?.id !== "material-object-studio") fail("generic visual direction did not expose diverse concept frames and an accepted concept path");
+    if (ordinaryConceptDirection.conceptSet?.candidates?.length !== 3 || new Set(ordinaryConceptDirection.conceptSet.candidates.map((item) => item.treatmentId)).size !== 3 || dataConceptDirection.conceptSet?.candidates?.length !== 3 || dataConceptDirection.conceptSet.candidates[0]?.directionId !== "data-detail-workbench" || new Set(dataConceptDirection.conceptSet.candidates.map((item) => item.treatmentId)).size !== 3) fail("adaptive visual direction did not expose query-aware structural divergence");
+    if (authoredDirection.id !== "folded-field" || authoredDirection.selectionStatus !== "authored-proposal" || authoredDirection.constraintAuthority?.mode !== "model-proposed" || authoredDirection.firstViewport.layout.includes("55-65%")) fail("authored direction did not replace the local composition candidate");
+    if (hardwareDirection.id !== "object-led-editorial" || analyticsDirection.id !== "data-detail-workbench" || agentDirection.id !== "stateful-instrument" || galleryDirection.id !== "specimen-catalog" || rewampDirection.id !== "specimen-catalog") fail("visual direction routing did not resolve the product-specific grammar");
+    if (companyDirection.visualTreatment?.id !== "quiet-editorial-studio") fail("ordinary company site did not resolve a visual treatment");
+    if (projectOwnedDirection.constraintAuthority?.mode !== "project-owned" || projectOwnedDirection.constraintAuthority?.source !== "DESIGN.md") fail("project-owned DESIGN.md did not outrank local defaults");
+    if (inspectedReferenceDirection.constraintAuthority?.mode !== "reference-led" || inspectedReferenceDirection.constraintAuthority?.evidenceStatus !== "observed") fail("inspected reference did not become creative authority");
+    if (modelDirection.constraintAuthority?.mode !== "model-proposed" || !modelDirection.constraintAuthority?.canOverrideAdvisory) fail("model-proposed direction did not receive controlled creative freedom");
+    if ([genericDirection, hardwareDirection, analyticsDirection, agentDirection, galleryDirection].some((direction) => direction.antiAiChecks.length < 3 || !direction.advisoryChecks?.length || !direction.typeRules?.hierarchy || !direction.surfaceRules?.cardBudget || !direction.geometryRules?.edgeCharacter || !direction.geometryRules?.linePolicy || !direction.visualTreatment?.geometry || !direction.visualTreatment?.signatureDevice || !direction.productSignal?.mode)) fail("visual direction contract is incomplete");
+    if ([analyticsDirection, agentDirection, galleryDirection].some((direction) => direction.productSignal.mode !== "product" || !direction.productSignal.primaryAction)) fail("functional visual directions did not expose a product signal");
+    if ([genericDirection, hardwareDirection].some((direction) => !["authored-experience", "open-experience", "product"].includes(direction.productSignal.mode) || (direction.productSignal.mode !== "product" && !direction.productSignal.experience?.creativeThesis))) fail("open visual directions did not expose an experience signal");
+    if (!renderVisualDirection(genericDirection).includes("no preset product type") || !renderBriefMarkdown(genericBrief).includes("Experience Signal Contract")) fail("open requests were still rendered as a fixed product contract");
+    if (!brief.visualDirection?.id || !hardwareBrief.visualDirection?.firstViewport?.alignmentAxis) fail("brief did not expose the visual direction contract");
+    if (!brief.quality.gates.some((gate) => gate.id === "constraint-authority")) fail("brief did not expose the constraint-authority quality gate");
+    if (!brief.quality.gates.some((gate) => gate.id === "geometry-language") || !brief.quality.antiPatterns.some((item) => item.id === "hard-edge-scaffolding")) fail("brief did not expose the geometry language gate and hard-edge warning");
+    if (referenceBuild.primaryReference.id !== "rare-ui" || referenceBuild.pagePlan.length === 0 || referenceBuild.componentGrammar.length === 0 || !referenceBuild.fidelityAnchors?.composition || !referenceBuild.fidelityAnchors?.geometry || !referenceBuild.productSignal?.prototypeInteraction || !referenceBuild.completionContract?.requirements?.length || !referenceBuild.completionContract?.plannedRegions) fail("reference build contract did not resolve the named primary reference, product signal, completion, and geometry anchor");
+    for (const direction of [genericDirection, authoredDirection, hardwareDirection, agentDirection, brief.visualDirection, referenceBuild.visualDirection]) {
+      const iteration = direction.creativeProcess?.visualIteration;
+      if (iteration?.status !== "planned-not-executed" || iteration.evidence?.acceptanceSource !== "actual-render" || iteration.evidence?.generatedImageRole !== "proposal-or-asset") fail("visual iteration plan confused a proposal or planned tool call with rendered acceptance");
+    }
+    if (authoredBuild.visualDirection?.selectionStatus !== "authored-proposal" || authoredBuild.firstViewport.layout !== "A continuous off-axis reading field with an attached index." || authoredBuild.creativeProcess?.status !== "authored-proposal") fail("reference build did not preserve the authored creative direction");
+    if (magicBuild.primaryReference.id !== "magic-ui" || magicBuild.pagePlan.length === 0 || magicBuild.motionContract.fallback.length === 0) fail("reference build did not resolve the new source-owned lens");
+    if (rewampBuild.primaryReference.id !== "rewamp-ui" || !rewampBuild.pagePlan.some((section) => section.id === "component-index") || !rewampBuild.componentGrammar.some((item) => item.id === "specimen-stage") || !rewampBuild.responsivePlan.mobile.includes("selected identity")) fail("reference build did not apply the Rewamp UI component-workbench recipe");
+    if (!externalBuild.primaryReference.id.startsWith("external-") || externalBuild.visualGenome.family !== "unknown until live inspection") fail("reference build did not preserve an unknown URL as an inspect-first reference");
+    if (!audit.referenceCoverage.some((item) => item.id === "graphify") || !audit.referenceCoverage.some((item) => item.id === "reference-lenses") || !audit.referenceCoverage.some((item) => item.id === "research-atlas") || !audit.referenceCoverage.some((item) => item.id === "visual-treatment") || !audit.referenceCoverage.some((item) => item.id === "geometry-language") || !audit.referenceCoverage.some((item) => item.id === "constraint-authority")) fail("audit reference coverage is incomplete");
+    if (audit.pipeline?.length < 8 || !audit.pipeline.some((item) => item.id === "product-signal") || !audit.pipeline.some((item) => item.id === "surface-completeness") || !audit.pipeline.some((item) => item.id === "transitions" && item.status !== "skipped") || audit.referenceInventory?.length < 8 || audit.resourceMatrix?.length < 12) fail("full audit did not execute the complete capability pipeline");
+    if (!audit.pipeline.some((item) => item.id === "visual-iteration" && item.status === "pending") || audit.visualIteration?.status !== "planned-not-executed") fail("static audit incorrectly reported screenshot or image iteration as completed");
+    if (!audit.pipeline.some((item) => item.id === "visual-direction") || !audit.proof.direction.visualDirection?.surfaceRules?.cardBudget || !audit.proof.direction.visualDirection?.geometryRules?.edgeCharacter || !audit.controlDials?.linePolicy) fail("full audit did not expose the visual direction and geometry contract");
+    if (audit.referenceBuild?.referenceMode !== "adaptive-no-reference" || !audit.controlDials?.referenceFidelity || !audit.proof.productSignal?.object || !audit.proof.completionContract?.requirements?.length) fail("full audit did not keep an unnamed request adaptive while producing the product and completion contracts");
+    if (referenceAudit.proof.referenceBuild?.primaryReference?.id !== "rare-ui") fail("audit did not activate the reference build path");
+    if (hardwareAudit.referenceBuild?.referenceMode !== "scouted-reference" || !["apple-product", "bang-olufsen", "teenage-engineering", "logitech-mx"].includes(hardwareAudit.referenceBuild?.primaryReference?.id) || !hardwareAudit.referenceInventory?.some((item) => item.id === hardwareAudit.referenceBuild.primaryReference.id && item.status === "primary-product")) fail("product reference scouting did not feed the visual build contract");
+    if (!motionAudit.proof.motion?.workflow?.includes("review") || !motionAudit.proof.motion.workflow.includes("polish")) fail("audit motion integration did not return the full workflow");
+    if (renderScanMarkdown(report).includes("[object Object]")) fail("inspect markdown renderer returned [object Object]");
+    if (renderBriefMarkdown(brief).includes("[object Object]") || !renderBriefMarkdown(brief).includes("Product Signal Contract") || !renderBriefMarkdown(brief).includes("Completion Contract")) fail("brief markdown renderer returned incomplete product and completion output");
+    if (renderMapMarkdown(map).includes("[object Object]")) fail("project map markdown renderer returned [object Object]");
+    if (renderGraphMarkdown(graph, graphQuery).includes("[object Object]")) fail("project graph markdown renderer returned [object Object]");
+    if (renderResourceMarkdown(resources).includes("[object Object]")) fail("resource markdown renderer returned [object Object]");
+    if (renderReferenceComposition(references).includes("[object Object]")) fail("reference markdown renderer returned [object Object]");
+    if (renderReferenceScout(hardwareScout).includes("[object Object]")) fail("reference scout markdown renderer returned [object Object]");
+    if (renderReferenceBuild(referenceBuild).includes("[object Object]") || !renderReferenceBuild(referenceBuild).includes("Product Signal Contract") || !renderReferenceBuild(referenceBuild).includes("Completion Contract")) fail("reference build markdown renderer returned incomplete product and completion output");
+    if (renderVisualDirection(agentDirection).includes("[object Object]") || !renderVisualDirection(agentDirection).includes("Product Signal Contract") || !renderVisualDirection(agentDirection).includes("Completion Contract") || !renderVisualDirection(agentDirection).includes("Visual Treatment") || !renderVisualDirection(agentDirection).includes("Geometry Rules") || !renderVisualDirection(agentDirection).includes("AI-Default Checks (Advisory)") || !renderVisualDirection(agentDirection).includes("Constraint Authority")) fail("visual direction markdown renderer is incomplete");
+    if (renderAuditMarkdown(audit).includes("[object Object]") || !renderAuditMarkdown(audit).includes("Product Signal Contract") || !renderAuditMarkdown(audit).includes("Completion Contract")) fail("audit markdown renderer returned incomplete product and completion output");
+    const inspectMd = execFileSync(process.execPath, [join(root, "scripts", "inspect-project.mjs"), root, "--format", "md"], { encoding: "utf8" });
+    const briefMd = execFileSync(process.execPath, [join(root, "scripts", "design-brief.mjs"), "--query", "analytics dashboard", "--format", "md"], { encoding: "utf8" });
+    const briefJson = execFileSync(process.execPath, [join(root, "scripts", "design-brief.mjs"), "--query", "analytics dashboard", "--format", "json"], { encoding: "utf8" });
+    const directionMd = execFileSync(process.execPath, [join(root, "scripts", "visual-direction.mjs"), "--query", "AI agent dashboard with approval modal", "--profile", "productive-app", "--format", "md"], { encoding: "utf8" });
+    const directionJson = execFileSync(process.execPath, [join(root, "scripts", "visual-direction.mjs"), "--query", "AI agent dashboard with approval modal", "--profile", "productive-app", "--format", "json"], { encoding: "utf8" });
+    const conceptDirectionJson = execFileSync(process.execPath, [join(root, "scripts", "visual-direction.mjs"), "--query", "我要一个网站", "--concept", "object-story", "--format", "json"], { encoding: "utf8" });
+    const designLoopJson = execFileSync(process.execPath, [join(root, "scripts", "design-loop.mjs"), "--query", "analytics dashboard with empty state", "--format", "json"], { encoding: "utf8" });
+    const mapJson = execFileSync(process.execPath, [join(root, "scripts", "project-map.mjs"), root, "--query", "package test script", "--format", "json"], { encoding: "utf8" });
+    const graphJson = execFileSync(process.execPath, [join(root, "scripts", "project-graph.mjs"), root, "--query", "motion adapter", "--format", "json"], { encoding: "utf8" });
+    const resourceJson = execFileSync(process.execPath, [join(root, "scripts", "resource-catalog.mjs"), "--query", "accessible modal", "--stack", "react", "--format", "json"], { encoding: "utf8" });
+    const referenceMd = execFileSync(process.execPath, [join(root, "scripts", "reference-composition.mjs"), "--query", "AI agent dashboard with approval modal", "--format", "md"], { encoding: "utf8" });
+    const referenceJson = execFileSync(process.execPath, [join(root, "scripts", "reference-composition.mjs"), "--query", "AI agent dashboard with approval modal", "--format", "json"], { encoding: "utf8" });
+    const scoutMd = execFileSync(process.execPath, [join(root, "scripts", "reference-scout.mjs"), "--query", "高端硬件外设官网", "--format", "md"], { encoding: "utf8" });
+    const scoutJson = execFileSync(process.execPath, [join(root, "scripts", "reference-scout.mjs"), "--query", "高端硬件外设官网", "--format", "json"], { encoding: "utf8" });
+    const referenceBuildMd = execFileSync(process.execPath, [join(root, "scripts", "reference-build.mjs"), "--query", "Build a component gallery for our analytics SDK like Rare UI", "--format", "md"], { encoding: "utf8" });
+    const referenceBuildJson = execFileSync(process.execPath, [join(root, "scripts", "reference-build.mjs"), "--query", "Build a component gallery for our analytics SDK like Rare UI", "--format", "json"], { encoding: "utf8" });
+    const externalBuildJson = execFileSync(process.execPath, [join(root, "scripts", "reference-build.mjs"), "--query", "Build a product like https://example.com/visual-tool for our workflow", "--format", "json"], { encoding: "utf8" });
+    const auditJson = execFileSync(process.execPath, [join(root, "scripts", "audit.mjs"), root, "--query", "analytics dashboard", "--offline", "--format", "json"], { encoding: "utf8" });
+    if (JSON.parse(auditJson).visualIteration?.status !== "planned-not-executed") fail("CLI audit lost the unexecuted status of visual iteration");
+    const referenceAuditJson = execFileSync(process.execPath, [join(root, "scripts", "audit.mjs"), root, "--query", "Build a component gallery like Rare UI", "--offline", "--format", "json"], { encoding: "utf8" });
+    const motionMd = execFileSync(process.execPath, [join(root, "scripts", "transitions-adapter.mjs"), "--intent", "modal close cleanup", "--phase", "all", "--offline", "--format", "md"], { encoding: "utf8" });
+    const motionJson = execFileSync(process.execPath, [join(root, "scripts", "transitions-adapter.mjs"), "--intent", "modal close cleanup", "--phase", "all", "--offline", "--format", "json"], { encoding: "utf8" });
+    if (inspectMd.includes("[object Object]") || briefMd.includes("[object Object]") || directionMd.includes("[object Object]")) fail("CLI markdown smoke output returned [object Object]");
+    if (!JSON.parse(briefJson).recommendation?.profile?.id) fail("CLI JSON smoke output is incomplete");
+    if (JSON.parse(designLoopJson).rounds !== 20 || JSON.parse(designLoopJson).roundsDetail?.length !== 20) fail("CLI design production loop output is incomplete");
+    const cliLoopFixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-cli-loop-"));
+    try {
+      const loopStartJson = execFileSync(process.execPath, [join(root, "scripts", "design-loop.mjs"), "start", "--project", cliLoopFixture, "--query", "create a research dashboard", "--format", "json"], { encoding: "utf8" });
+      const loopStart = JSON.parse(loopStartJson);
+      if (!loopStart.id?.startsWith("loop-") || loopStart.rounds?.length !== 20 || loopStart.status !== "in-progress" || !loopStart.researchAtlas?.id || !loopStart.researchAtlas?.path) fail("CLI design loop session start is incomplete");
+    } finally {
+      rmSync(cliLoopFixture, { recursive: true, force: true });
+    }
+    if (JSON.parse(directionJson).id !== "stateful-instrument" || !JSON.parse(directionJson).productSignal?.primaryAction || !JSON.parse(directionJson).visualTreatment?.id || !JSON.parse(directionJson).visualTreatment?.geometry || !JSON.parse(directionJson).geometryRules?.edgeCharacter || !JSON.parse(directionJson).constraintAuthority?.mode || !directionMd.includes("Product Signal Contract") || !directionMd.includes("Visual Treatment") || !directionMd.includes("Concept Set") || !directionMd.includes("Geometry Rules") || !directionMd.includes("AI-Default Checks (Advisory)")) fail("CLI visual direction output is incomplete");
+    if (JSON.parse(conceptDirectionJson).selectionStatus !== "accepted-concept" || JSON.parse(conceptDirectionJson).id !== "object-led-editorial") fail("CLI visual direction did not accept the requested concept frame");
+    if (!JSON.parse(mapJson).results?.some((item) => item.path === "package.json")) fail("CLI project map JSON output is incomplete");
+    if (!JSON.parse(graphJson).nodes?.length || !JSON.parse(graphJson).query?.results?.length) fail("CLI project graph JSON output is incomplete");
+    if (!JSON.parse(resourceJson).candidates?.length) fail("CLI resource JSON output is incomplete");
+    if (!JSON.parse(referenceJson).selected?.length || JSON.parse(referenceJson).selected.length > 4) fail("CLI reference JSON output is incomplete");
+    if (!JSON.parse(scoutJson).selected?.some((item) => item.id === "apple-product")) fail("CLI reference scout JSON output is incomplete");
+    if (referenceMd.includes("[object Object]") || !referenceMd.includes("Borrow:") || !referenceMd.includes("Translate:")) fail("reference composition markdown smoke output is incomplete");
+    if (scoutMd.includes("[object Object]") || !scoutMd.includes("Selection Policy") || !scoutMd.includes("Live Inspection Checklist")) fail("reference scout markdown smoke output is incomplete");
+    if (referenceBuildMd.includes("[object Object]") || !referenceBuildMd.includes("Visual Genome") || !referenceBuildMd.includes("Product Signal Contract") || !referenceBuildMd.includes("Completion Contract") || !referenceBuildMd.includes("Token Seed") || !referenceBuildMd.includes("Acceptance")) fail("reference build markdown smoke output is incomplete");
+    if (JSON.parse(referenceBuildJson).primaryReference?.id !== "rare-ui" || !JSON.parse(referenceBuildJson).productSignal?.object || !JSON.parse(referenceBuildJson).completionContract?.requirements?.length || !JSON.parse(referenceBuildJson).fidelityAnchors?.composition || !JSON.parse(referenceBuildJson).fidelityAnchors?.geometry || !JSON.parse(referenceBuildJson).motionContract?.fallback) fail("reference build JSON output is incomplete");
+    if (!JSON.parse(externalBuildJson).primaryReference?.id?.startsWith("external-")) fail("CLI reference build did not preserve an unknown URL");
+    if (!JSON.parse(auditJson).referenceCoverage?.length || !JSON.parse(auditJson).productSignal?.object || !JSON.parse(auditJson).completionContract?.requirements?.length || !JSON.parse(auditJson).researchAtlas?.status || !JSON.parse(auditJson).pipeline?.some((item) => item.id === "research-atlas" && item.status === "required") || !JSON.parse(auditJson).pipeline?.some((item) => item.id === "product-signal") || !JSON.parse(auditJson).pipeline?.some((item) => item.id === "surface-completeness") || !JSON.parse(auditJson).pipeline?.some((item) => item.id === "transitions")) fail("CLI audit JSON output is incomplete");
+    if (JSON.parse(referenceAuditJson).proof?.referenceBuild?.primaryReference?.id !== "rare-ui") fail("CLI audit did not expose the reference build path");
+    if (motionMd.includes("[object Object]") || !motionMd.includes("Review") || !motionMd.includes("Polish")) fail("motion adapter markdown smoke output is incomplete");
+    const motion = JSON.parse(motionJson);
+    if (!motion.guardrails?.cleanup || !motion.guardrails?.reducedMotion || !motion.guardrails?.fallback) fail("motion adapter JSON guardrails are incomplete");
+    if (!motion.selected?.some((item) => item.id === "modal")) fail("motion adapter did not select the modal recipe");
+  } catch (error) {
+    fail(`smoke execution failed: ${error.message}`);
+  }
+}
+
+for (const path of [
+  join(root, "SKILL.md"), join(root, "README.md"), join(root, "package.json"),
+  join(root, "agents", "openai.yaml"), join(root, "bin", "frontend-art-direction.js"),
+  join(root, "references", "operating-modes.md"), join(root, "references", "motion.md"),
+  join(root, "references", "reference-composition.md"),
+  join(root, "references", "assets.md"),
+  join(root, "references", "premium-finish.md"),
+  join(root, "references", "reference-discovery.md"),
+  join(root, "references", "reference-build.md"),
+  join(root, "references", "visual-composition.md"),
+  join(root, "references", "constraint-authority.md"),
+  join(root, "references", "creative-direction.md"),
+  join(root, "references", "visual-iteration.md"),
+  join(root, "references", "product-prototype.md"),
+  join(root, "references", "design-production-loop.md"),
+  join(root, "references", "research-atlas.md"),
+  join(root, "references", "independent-critique.md"),
+  join(root, "docs", "research-synthesis.md"),
+  join(root, "templates", "DESIGN.md"), join(root, "scripts", "transitions-adapter.mjs"),
+  join(root, "scripts", "project-graph.mjs"), join(root, "scripts", "resource-catalog.mjs"), join(root, "scripts", "audit.mjs"),
+  join(root, "data", "quality-gates.json"), join(root, "data", "resources.json"), join(root, "data", "reference-lenses.json"), join(root, "data", "reference-recipes.json"), join(root, "data", "reference-sources.json"),
+  join(root, "scripts", "reference-composition.mjs"), join(root, "scripts", "reference-scout.mjs"), join(root, "scripts", "reference-build.mjs"),
+  join(root, "scripts", "visual-direction.mjs"),
+  join(root, "scripts", "authority.mjs"),
+  join(root, "scripts", "creative-process.mjs"),
+  join(root, "scripts", "product-signal.mjs"),
+  join(root, "scripts", "completion-contract.mjs"),
+  join(root, "scripts", "design-loop.mjs"),
+  join(root, "scripts", "design-loop-session.mjs"),
+  join(root, "scripts", "research-atlas.mjs"),
+  join(root, "data", "quality-rubric.json"),
+  join(root, "data", "visual-directions.json"),
+  join(root, "data", "visual-treatments.json"),
+  join(root, "data", "constraint-policy.json"),
+]) assertExists(path);
+
+async function checkIntentRegressions() {
+  for (const query of ["brand settings", "marketing workflow", "portfolio form", "品牌设置", "品牌产品配置器"]) {
+    const brief = buildBrief({ query });
+    const build = buildReferenceBuild({ query });
+    const audit = await buildAudit({ projectRoot: root, query, motion: false, offline: true });
+    for (const signal of [brief.productSignal, build.productSignal, audit.productSignal, audit.referenceBuild.productSignal]) {
+      if (signal.mode !== "product" || !signal.primaryAction || !signal.visibleResult || signal.stateMatrix.length === 0) {
+        fail(`functional intent lost its task/result/state contract: ${query}`);
+        break;
+      }
+    }
+  }
+
+  for (const query of ["实验性品牌叙事网页", "experimental video story", "我要一个网站"]) {
+    for (const reference of ["", "https://example.com/reference", "rare-ui"]) {
+      const build = buildReferenceBuild({ query, reference });
+      const imposed = new Set([
+        ...build.firstViewport.mustShow,
+        ...build.pagePlan.flatMap((section) => section.components),
+        ...build.buildOrder,
+      ]);
+      if (build.productSignal.mode === "product" || build.productSignal.primaryAction !== null
+        || ["one usable primary action", "one usable action", "one clear primary action", "primary action", "state matrix"].some((requirement) => imposed.has(requirement))) {
+        fail(`non-functional work inherited mandatory task controls: ${query} / ${reference || "no reference"}`);
+      }
+      if (!build.completionContract.requirements.length || !build.completionContract.proof.length || !build.pagePlan.length) {
+        fail(`experience routing lost complete-scope requirements: ${query}`);
+      }
+      renderReferenceBuild(build);
+    }
+  }
+
+  const fixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-authored-"));
+  try {
+    const guide = readFileSync(join(root, "references", "creative-direction.md"), "utf8");
+    const documented = JSON.parse(guide.match(/```json\n([\s\S]*?)\n```/)[1]);
+    const partial = {
+      label: "Authored Reading Field",
+      signature: "The artifact carries the composition.",
+      rationale: "Keep the real artifact ahead of the explanation.",
+      firstViewport: { layout: "A continuous reading field.", dominant: "The real artifact." },
+      build: { firstViewport: { layout: "The authored build refines the reading field." } },
+    };
+    for (const [name, authored] of [["documented", documented], ["partial", partial]]) {
+      const directionFile = join(fixture, `${name}.json`);
+      writeFileSync(directionFile, JSON.stringify(authored));
+      try {
+        const build = buildReferenceBuild({ query: "a reading tool for field notes", authoredDirection: authored });
+        const expectedLayout = authored.build?.firstViewport?.layout ?? authored.firstViewport.layout;
+        const rendered = renderReferenceBuild(build);
+        if (build.firstViewport.layout !== expectedLayout || !build.firstViewport.mustShow.length
+          || !rendered.includes(expectedLayout) || !rendered.includes(authored.label)) {
+          fail(`authored first viewport was lost in the rendered contract: ${name}`);
+        }
+        for (const command of ["direction", "brief", "reference-build", "audit"]) {
+          const args = [join(root, "bin", "frontend-art-direction.js"), command,
+            "--query", "a reading tool for field notes", "--direction-file", directionFile];
+          if (command === "audit") args.push("--project", root, "--no-motion", "--offline");
+          const output = execFileSync(process.execPath, args, { encoding: "utf8", stdio: "pipe" });
+          if (!output.includes(authored.label)) fail(`CLI ${command} lost the authored direction: ${name}`);
+        }
+        const output = execFileSync(process.execPath, [join(root, "bin", "frontend-art-direction.js"),
+          "reference-build", "--query", "a reading tool for field notes", "--direction-file", directionFile,
+          "--format", "json"], { encoding: "utf8", stdio: "pipe" });
+        const json = JSON.parse(output);
+        if (json.firstViewport.layout !== expectedLayout || !json.firstViewport.mustShow.length) {
+          fail(`CLI JSON did not preserve the authored first viewport: ${name}`);
+        }
+      } catch (error) {
+        fail(`authored direction could not produce CLI contracts (${name}): ${error.message}`);
+      }
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+async function checkProductContext() {
+  for (const query of [
+    "Claude Monet visual essay; three real paintings, complete reading sequence and native whole painting / brushwork detail viewer; no animated type or decorative loop",
+    "a photo viewer for architecture observations",
+    "a PDF viewer with document annotations",
+  ]) {
+    const brief = buildBrief({ query });
+    const build = buildReferenceBuild({ query });
+    const audit = await buildAudit({ query, projectRoot: root, motion: false, offline: true });
+    for (const result of [brief, build, audit]) {
+      const resolved = result.productRequest;
+      if (resolved?.profile.record.id === "spatial-product") fail(`a generic viewer invented a spatial product: ${query}`);
+    }
+    if (brief.referenceScout.selected.some((source) => source.id === "logitech-mx")) fail(`a generic viewer inherited a hardware reference: ${query}`);
+  }
+  for (const query of ["a 3D vehicle viewer", "a spatial model viewer", "a vehicle configurator", "一个模型查看器"]) {
+    if (buildBrief({ query }).recommendation.profile.id !== "spatial-product") fail(`explicit spatial evidence was discarded: ${query}`);
+  }
+  if (buildBrief({ query: "painting viewer", overrides: { profile: "spatial-product" } }).recommendation.profile.id !== "spatial-product") fail("an explicit spatial profile pin was discarded");
+  const fixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-product-"));
+  const productPath = join(fixture, "PRODUCT.md");
+  const run = (...args) => execFileSync(process.execPath, [join(root, "bin/frontend-art-direction.js"), ...args], { encoding: "utf8", stdio: "pipe" });
+  try {
+    mkdirSync(join(fixture, "src/routes"), { recursive: true });
+    writeFileSync(join(fixture, "package.json"), JSON.stringify({ dependencies: { react: "19.0.0" } }));
+    writeFileSync(join(fixture, "src/routes/commerce-dashboard.tsx"), "export default function View() { return null; }\n");
+    for (const query of ["我要一个网站", "make an app", "帮我优化一下", "make signal stage more authored"]) {
+      const brief = buildBrief({ query, projectRoot: fixture });
+      if (brief.recommendation.profile.id !== "adaptive-surface" || brief.visualDirection.constraintAuthority.mode !== "adaptive-default") fail(`framework/path evidence invented a product genre: ${query}`);
+    }
+    run("product-context", "template", "--project", fixture);
+    if (existsSync(productPath)) fail("printing a product template mutated the target");
+    initProductContext({ projectRoot: fixture });
+    if (Object.keys(readProductContext(fixture).fields).length) fail("blank product fields swallowed subsequent lines");
+    if (buildBrief({ query: "帮我优化一下", projectRoot: fixture }).recommendation.profile.id !== "adaptive-surface") fail("blank PRODUCT.md invented a product genre");
+    const original = readFileSync(productPath, "utf8");
+    for (const args of [[], ["--force=false"]]) {
+      let rejected = false;
+      try { run("product-context", "init", "--project", fixture, ...args); } catch { rejected = true; }
+      if (!rejected || readFileSync(productPath, "utf8") !== original) fail("product init replaced existing context without explicit force");
+    }
+    run("product-context", "status", "--project", fixture);
+    if (readFileSync(productPath, "utf8") !== original) fail("product status mutated the context file");
+    const partial = initProductContext({ projectRoot: fixture, force: true, values: { "product-audience": "photography portfolio for art directors" } });
+    if (partial.status !== "partial" || buildBrief({ query: "帮我优化一下", projectRoot: fixture }).recommendation.profile.id !== "portfolio-studio") fail("useful partial product facts were discarded");
+    const facts = {
+      "product-audience": "photography portfolio for art directors",
+      "primary-job": "Explore a gallery of cinematic city observations",
+      "primary-object": "The photographer's contact sheet from four coastal nights",
+      "non-goals": "ecommerce cart payment checkout store dashboard admin",
+      constraints: "Do not add an editor, command builder, or payment workflow",
+    };
+    initProductContext({ projectRoot: fixture, force: true, values: facts });
+    writeFileSync(join(fixture, "DESIGN.md"), "# DESIGN.md\n\n## Visual Direction\n- Design stance: warm contact-sheet archive\n- Signature move: material-led sequencing\n");
+    const project = scanProject(fixture);
+    const query = "make the stage more authored";
+    const brief = buildBrief({ query, projectRoot: fixture });
+    const direction = selectVisualDirection(query, { project });
+    const build = buildReferenceBuild({ query, projectRoot: fixture });
+    const audit = await buildAudit({ query, projectRoot: fixture, motion: false, offline: true });
+    for (const result of [brief, direction, build, audit]) {
+      const resolved = result.productRequest;
+      const authority = result.constraintAuthority ?? result.visualDirection?.constraintAuthority ?? result.proof?.direction?.constraintAuthority;
+      if (resolved?.profile.record.id !== "portfolio-studio" || resolved.source !== "PRODUCT.md") fail("a decision entrypoint lost the inherited product facts");
+      if (authority?.mode !== "project-owned") fail("background prose or a supporting component library overrode DESIGN.md");
+      if (result.productSignal.object !== facts["primary-object"] || result.productSignal.mode !== "authored-experience") fail("product facts were not translated into the subject contract");
+    }
+    if (brief.surfaceMode.mode !== "experience" || audit.surfaceMode.mode !== "experience") fail("audit recomputed visitor mode without product context");
+    if (build.primaryReference.id !== "adaptive-default") fail("background facts invented a named reference");
+    for (const query of ["不是电商，优化一下作品集", "not ecommerce but a portfolio"]) {
+      if (buildBrief({ query, projectRoot: fixture }).recommendation.profile.id !== "portfolio-studio") fail(`negative feedback became a positive genre match: ${query}`);
+    }
+    const checkout = buildBrief({ query: "build a checkout payment page", projectRoot: fixture });
+    if (checkout.recommendation.profile.id !== "commerce-flow" || checkout.productRequest.source !== "current-request" || checkout.productRequest.usedFields.length || checkout.productSignal.object === facts["primary-object"]) fail("an explicit new page inherited a conflicting product default");
+    const docs = buildBrief({ query: "build a documentation page", projectRoot: fixture });
+    if (docs.surfaceMode.mode !== "read" || docs.productRequest.usedFields.length) fail("product background replaced a page-specific visitor job");
+    const explicit = buildBrief({ query: "帮我优化一下", projectRoot: fixture, overrides: { profile: "creative-editor", surfaceMode: "operate" } });
+    if (explicit.recommendation.profile.id !== "creative-editor" || explicit.surfaceMode.mode !== "operate") fail("product context overrode an explicit pin");
+    const noDesign = selectVisualDirection(query, { project: { ...project, designAuthority: null } });
+    if (noDesign.constraintAuthority.mode !== "adaptive-default") fail("cinematic product prose became explicit visual authority");
+    if (noDesign.firstViewport.dominant !== facts["primary-object"] || build.firstViewport.dominant !== facts["primary-object"] || !build.firstViewport.mustShow.includes(facts["primary-object"])) fail("known subject did not replace the generic fallback object");
+    const readback = JSON.parse(run("product-context", "status", "--project", fixture, "--format", "json"));
+    if (readback.fields["primary-object"] !== facts["primary-object"]) fail("product-context CLI lost written facts");
+    const cliDirection = JSON.parse(run("direction", "--query", query, "--project", fixture, "--format", "json"));
+    if (cliDirection.productRequest.source !== "PRODUCT.md" || cliDirection.constraintAuthority.mode !== "project-owned") fail("direction CLI did not load project context");
+    const prior = readFileSync(productPath, "utf8");
+    let reportRejected = false;
+    try { run("product-context", "status", "--project", fixture, "--output", productPath); } catch { reportRejected = true; }
+    if (!reportRejected || readFileSync(productPath, "utf8") !== prior) fail("status output could overwrite PRODUCT.md");
+    const blank = parseProductContext(renderProductContextMarkdown({ fields: {} }));
+    if (Object.keys(blank.fields).length || blank.missing.length !== 2) fail("optional product fields became mandatory");
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+async function checkMotionIntentRegressions() {
+  const fixture = mkdtempSync(join(tmpdir(), "frontend-art-direction-motion-intent-"));
+  try {
+    writeFileSync(join(fixture, "app.js"), 'const values = items.filter(item => item.active);\nif (!blob) throw new Error("No image produced");\nconst modal = document.querySelector("#viewer");\nmodal.showModal();\n');
+    writeFileSync(join(fixture, "styles.css"), '@media (prefers-reduced-motion: reduce) { button { transition: none; } }\n.photo-button img { transition: transform 260ms ease; }\n');
+    writeFileSync(join(fixture, "index.html"), '<link rel="stylesheet" href="styles.css">\n<dialog id="viewer"></dialog>\n<img src="photo.jpg" loading="lazy">\n');
+    for (const intent of ["immediate type preview, undo and redo, palette selection; no animated text shaping", "文字预览与配色选择，不要文字动画", "styles and stable layout without animation", "open a modal without animation", "打开对话框，不要动画", "text input and search field"]) {
+      const plan = await buildMotionPlan({ intent, offline: true });
+      if (plan.selected.length || plan.workflow.apply.selected) fail(`unresolved or negative motion intent selected a recipe: ${intent}`);
+    }
+    const modal = await buildMotionPlan({ intent: "not a loading shimmer, but a modal opening", projectRoot: fixture, offline: true });
+    if (modal.selected[0]?.id !== "modal" || modal.selected.some(item => item.id === "shimmer-text")) fail("negative loading text overrode the positive modal job");
+    const findings = modal.workflow.review.projectFindings;
+    if (findings.some(item => /\.filter\(|new Error\(|stylesheet|prefers-reduced-motion|loading="lazy"/u.test(item.signal))) fail("source-only non-UI tokens became motion component findings");
+    if (!findings.some(item => item.candidate === "modal" && item.confidence === "review-needed")) fail("motion scan lost the actual dialog or overstated code-only certainty");
+    if (!findings.some(item => item.path === "styles.css" && item.candidate === null)) fail("an unrelated transition inherited the project modal intent");
+    const explicit = await buildMotionPlan({ intent: "no general text effects", transition: "shimmer-text", offline: true });
+    if (explicit.selected[0]?.id !== "shimmer-text" || explicit.selected[0]?.confidence !== "explicit") fail("conservative matching overrode a pinned transition");
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+async function main() {
+  checkSkill();
+  checkPackage();
+  checkData();
+  checkMarkdownLinks();
+  checkScripts();
+  await checkSmoke();
+  await checkIntentRegressions();
+  await checkProductContext();
+  await checkMotionIntentRegressions();
+
+  if (errors.length > 0) {
+    console.error(`FAIL ${errors.length} check(s)`);
+    for (const error of errors) console.error(`- ${error}`);
+    process.exit(1);
+  }
+
+  console.log(`PASS frontend-art-direction checks (${walkFiles(root).length} files scanned)`);
+  for (const note of notes) console.log(`NOTE ${note}`);
+}
+
+if (isMainModule(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

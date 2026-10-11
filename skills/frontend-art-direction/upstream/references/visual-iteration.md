@@ -1,0 +1,93 @@
+# Screenshot And Image Iteration
+
+Use this workflow for a substantial build or redesign, especially when feedback says bland, incomplete, or unlike the supplied reference. It applies to any design form. Keep the user's subject, content, scope, and chosen direction as the authority.
+
+## Start With The Real Render
+
+For an existing target, capture its current state before redesigning it. For a new target, implement the chosen composition with real content, run it, and capture a baseline as soon as it is inspectable. A browser, device, or platform-native capture is the implementation evidence; an image-generation output is a proposal or asset.
+
+Use the project's existing browser or device tooling. Save and actually inspect the captures; an HTTP response, screenshot command, or build result alone does not establish how the surface looks. Record the route, actual viewport, state, scroll position, and capture path. Verify that the requested viewport took effect and the screenshot dimensions agree; browser UI or emulation settings may apply to a different tab. Allow fonts and assets to load; exercise lazy content before judging missing regions. Do not accept a capture taken during an entrance or route animation: wait for the settled state or use reduced motion, then confirm the screenshot itself matches the reported viewport.
+
+Capture the declared scope at desktop and target mobile. For a long page, combine a full-page capture for rhythm with readable viewport captures of the opening, middle, ending, and any region under review. For a tool or multi-route experience, capture its important routes and states. Include relevant fallback or reduced-motion behavior. A still image cannot prove motion quality: exercise the trigger and inspect start, transition, final state, interruption, and replay when applicable.
+
+For a full-page capture, load the relevant lazy regions, then return to the recorded starting position before capturing. A capture made from a scrolled document can place fixed chrome differently from normal reading; inspect that artifact before treating it as a page defect. After resizing, compare the screenshot itself with the reported dimensions and layout: an initial capture may still contain the previous visual frame even when DOM dimensions already report the new viewport.
+
+## Screenshot To Code Loop
+
+1. Inspect the baseline beside the inspected reference, selected concept, or recorded design thesis at a comparable viewport and state.
+2. Name the largest visible problems with their region, consequence, and intended repair. Start with broken content, incomplete scope, composition, hierarchy, and media; then type, spacing, edges, and detail.
+3. Change the relevant code or asset. Keep established strengths unless the new direction deliberately replaces them.
+4. Run the changed surface, repeat the same capture conditions, and inspect before/after. Check nearby regions, mobile, and relevant states for regressions. When a control changes a visual state from below or beside the object, capture the result with the changed object in view rather than accepting a selected control as proof.
+5. Keep changes supported by the render and repeat for remaining material issues. A second screenshot with no inspected comparison is not an iteration.
+
+Fix ordinary text fit, overflow, control behavior, and responsive defects directly in code. If the issue is the visual thesis, media, or composition itself, use the image loop to explore a better relationship. Do not keep tuning shadows around a failed direction.
+
+## Screenshot To Image To Code Loop
+
+For a visually open request or weak first render, use available image generation to produce or edit a concrete visual target. The agent handles the generation and translation within the task; the user should not have to run another service. Skip image generation when a local code fix or existing authoritative design already resolves the issue.
+
+When a real screenshot exists, inspect it first and use it as the edit target. Label other inputs as reference or asset, rather than allowing their brand, content, or layout to silently replace the target. For a new direction with no render, generate a concept from the real brief, content, and available media. Explore structural alternatives only when the direction is unresolved; refine a selected image for a focused repair.
+
+Use the available image-generation skill and built-in tool by default. Use returned paths for subsequent edits, preserve the source image, and save siblings for revisions. If generation is unavailable, continue screenshot-to-code work and state that limitation. Do not claim a generated round happened or silently switch to a paid API workflow.
+
+Record the handoff in the provider-neutral journal so a proposal cannot disappear into chat history:
+
+```bash
+node <skill-root>/scripts/image-proposal.mjs start \
+  --project /path/to/project \
+  --query "make the stage more authored" \
+  --baseline artifacts/baseline.png \
+  --gap "the first viewport is visually even"
+
+node <skill-root>/scripts/image-proposal.mjs add \
+  --project /path/to/project --session <id> --id stage-v1 \
+  --path artifacts/proposal.png --role screenshot-edit \
+  --prompt "Keep the subject and real content; create a stronger stage silhouette." \
+  --summary "A clearer dominant stage and quieter supporting field." \
+  --inputs baseline-screenshot,reference \
+  --preserve "subject,content,working controls"
+
+node <skill-root>/scripts/image-proposal.mjs select \
+  --project /path/to/project --session <id> --proposal stage-v1
+node <skill-root>/scripts/image-proposal.mjs translate \
+  --project /path/to/project --session <id> \
+  --source-diff artifacts/translation.diff \
+  --delta "Translated the stage relationship into source and usable assets."
+node <skill-root>/scripts/image-proposal.mjs record \
+  --project /path/to/project --session <id> --kind after --path artifacts/after.png
+node <skill-root>/scripts/image-proposal.mjs close \
+  --project /path/to/project --session <id>
+```
+
+The journal validates local media at each handoff and keeps the proposal prompt, input roles, selected decision, source translation, and actual after render together. It does not call an image provider, capture a browser, or install dependencies; the agent runs those tools and then records their outputs. Use `reject` when the proposal is weak and return to screenshot-to-code or create another bounded proposal.
+
+Useful prompt scaffold; keep only fields needed for this iteration:
+
+```text
+Use case: ui-mockup
+Role: a visual revision proposal, not an implementation screenshot
+Inputs: current browser screenshot as edit target; other inputs with named roles
+Subject, real content, and intended scope:
+Viewport and state being revised:
+Observed defects: <specific visible problems and their locations>
+Change: <the composition, type/media relationship, material, or asset being explored>
+Preserve: <real content, subject identity, working relationships, and user direction>
+Completion: <include the relevant middle, ending, or neighboring region>
+Output: <one inspectable revision of the requested surface>
+```
+
+Inspect the generated revision. Reject hallucinated content, illegible type, missing regions, impossible controls, or a new generic template. Select a revision by its visible improvement, content fit, and feasibility. Record an assumption and continue when selection is reversible; a concept pass does not introduce a new approval requirement.
+
+Translate the selected revision into specific implementation changes: reading order, alignment, type roles, proportions, media crop, surface/edge relationships, asset choice, and responsive restaging. Keep the layout free to follow the work. Obtain or generate individual usable media where needed; a mockup image is not automatically a production asset.
+
+Implement real text, semantic controls, content, states, and layout. Do not ship the mockup as a flattened webpage. Re-run the browser and compare the actual render against the selected revision. Generated-image typography or a decorative control is not proof that its coded counterpart works. When the render fails to carry the chosen relationship, correct the implementation or revise the concept and repeat.
+
+## Convergence And Evidence
+
+Stop when the declared scope is complete, material visible defects are resolved, the selected thesis survives desktop/mobile, and the relevant interactions or authored ending work. Do not prescribe a universal style or a fixed number of aesthetic rounds. If successive rounds stop improving, return to the weak direction or missing asset instead of producing near-identical revisions. Report actual tooling or content blockers without claiming acceptance.
+
+Keep a compact ledger in [the evidence template](../templates/EVIDENCE.md): baseline capture, inspected defects, proposal image and prompt if used, accepted implementation delta, new capture, resolved issues, and remaining issues. Preserve the selected concept separately from runtime proof. The `image-proposal` journal makes this handoff inspectable, but still requires real tool execution by the implementing agent; it never fabricates a proposal or browser proof.
+
+When forward-testing the skill across different briefs, compare their artifacts together. Repeated silhouette, default type/material combinations, or decorative chrome may expose a model preference that was mistaken for subject-specific direction. Keep a shared language when the same brand or system warrants it; otherwise revisit the subject and primary job. Do not turn a test output into a starter skin or require every brief to have different colors. If the task produces a file, inspect that actual file against the working object; a success toast does not prove export fidelity.
+
+When a development target is already running and the problem benefits from comparing alternatives, use [the live iteration protocol](live-iteration.md). It records the baseline, bounded variants, accept/discard decision, source diff, and after-capture proof. A session journal is a handoff and evidence record; it does not replace the browser capture itself.

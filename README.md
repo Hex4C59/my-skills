@@ -17,9 +17,9 @@ my-skills/
 
 ## Skill 总览
 
-已收录 **10 个项目入口**：图片中第 2、3、4、5、6、8、9 项，以及 `git-commit`、`writing-for-agents`、`writing-clearly-and-concisely`，收录日期为 **2026-10-11**。每项保留固定提交的上游源码、中文入口及来源记录，许可证或许可说明见各项介绍。前 7 项保留完整仓库快照；其余项目保留各自的具体 Skill 目录。快照中的其他 Skill、变体和宿主适配不另行计入本表。
+已收录 **11 个项目入口**：图片中第 2、3、4、5、6、8、9 项，以及 `git-commit`、`writing-for-agents`、`writing-clearly-and-concisely`、`frontend-art-direction`，收录日期为 **2026-10-11**。每项保留固定提交的上游源码、中文入口及来源记录，许可证或许可说明见各项介绍。前 7 项保留完整仓库快照；frontend-art-direction 保留上游发布文件与维护说明；其余项目保留各自的具体 Skill 目录。快照中的其他 Skill、变体和宿主适配不另行计入本表。
 
-`skills/` 用于源码维护。Humanizer、Agent-Reach、git-commit 与 writing-for-agents 已按用户授权安装到当前项目的 `.agents/skills/`；其余 6 个项目保留源码收录状态。文字和技术说明统一使用 humanizer；Agent 指令文档使用 writing-for-agents，由它调用 humanizer。writing-clearly-and-concisely 保留源码参考，已撤下项目安装。Agent-Reach 的核心 CLI 与 Python 依赖安装在项目独立环境中，详见下方“当前项目安装”。
+`skills/` 用于源码维护。Humanizer、Agent-Reach、git-commit 与 writing-for-agents 已按用户授权安装到当前项目的 `.agents/skills/`；其余 7 个项目保留源码收录状态。文字和技术说明统一使用 humanizer；Agent 指令文档使用 writing-for-agents，由它调用 humanizer。writing-clearly-and-concisely 保留源码参考，已撤下项目安装。Agent-Reach 的核心 CLI 与 Python 依赖安装在项目独立环境中，详见下方“当前项目安装”。
 
 | Skill | 用途 | 来源类型 | 原项目 / 下载地址 |
 | --- | --- | --- | --- |
@@ -33,6 +33,7 @@ my-skills/
 | [git-commit](skills/git-commit/SKILL.md) | 分析 Git diff、生成提交信息并按用户要求执行提交。 | 第三方修改版（仅入口包装） | [官方 Skill](https://github.com/github/awesome-copilot/tree/82701c24b99488536ca399ff4789a458b7a05db7/skills/git-commit) / [主文件下载](https://raw.githubusercontent.com/github/awesome-copilot/82701c24b99488536ca399ff4789a458b7a05db7/skills/git-commit/SKILL.md) |
 | [writing-for-agents](skills/writing-for-agents/SKILL.md) | 整理 Agent 文档结构后调用 humanizer 润色，保留规则并改善阅读体验。 | 第三方修改版（结构与润色联动） | [官方 Skill](https://github.com/mattpocock/skills/tree/49dd158d1076134a641b33efb035946536778336/skills/productivity/writing-for-agents) / [主文件下载](https://raw.githubusercontent.com/mattpocock/skills/49dd158d1076134a641b33efb035946536778336/skills/productivity/writing-for-agents/SKILL.md) |
 | [writing-clearly-and-concisely](skills/writing-clearly-and-concisely/SKILL.md) | 保留源码参考；中文表达规则已并入 humanizer，当前项目不单独安装。 | 第三方修改版（中文技术表达） | [官方 Skill](https://github.com/obra/the-elements-of-style/tree/05fc4f0d2b97b7c042dd9949ad658568e4a1324e/skills/writing-clearly-and-concisely) / [主文件下载](https://raw.githubusercontent.com/obra/the-elements-of-style/05fc4f0d2b97b7c042dd9949ad658568e4a1324e/skills/writing-clearly-and-concisely/SKILL.md) |
+| [frontend-art-direction](skills/frontend-art-direction/SKILL.md) | 选择前端设计方向，结合现有组件实现界面，并通过截图与交互检查验证效果。 | 第三方修改版（仅入口包装） | [官方项目](https://github.com/davaded/frontend-art-direction) / [固定提交下载](https://codeload.github.com/davaded/frontend-art-direction/tar.gz/9696da4c573bada9deea5564af7cfeb159f6fdda) |
 
 目录结构示例：
 
@@ -227,6 +228,24 @@ skills/<skill-name>/
 - **许可证**：上游将 1918 年参考文本标为 Public Domain（公有领域）；未发现独立许可证文件，Skill 指令许可待确认。原始声明见[上游 README](skills/writing-clearly-and-concisely/upstream/README.md)。
 - **收录日期**：2026-10-11。
 - **个人修改**：加入中文表达、首次术语解释、按需举例和交付前检查；英文语法与标点规则限用于英文内容。上游文件原样保留，详见[来源记录](skills/writing-clearly-and-concisely/SOURCE.md)。
+
+### frontend-art-direction
+
+- **指令文件**：[中文收录入口](skills/frontend-art-direction/SKILL.md)；[上游原版](skills/frontend-art-direction/upstream/SKILL.md)。
+- **用途**：先了解产品与现有界面，再确定布局、字体、组件和动效，并通过实际页面验证改动。
+- **适用场景**：应用、仪表盘、编辑器、设置页、产品官网，以及参考网站驱动的界面改版和视觉审查。
+- **使用示例**：`请用 frontend-art-direction 审查这个应用的设置页，保留已确认的设计与功能，先报告排版和状态展示问题。`
+- **所需输入**：目标项目或页面、用户任务、希望改善的问题、功能与设计约束；可选参考网站、截图和素材。
+- **预期输出**：设计方向、前端实现或界面审查结果，以及与任务相符的截图、交互和运行证据。
+- **依赖与限制**：辅助脚本要求 Node.js >=18；实际实现依赖目标项目工具链。截图工具需要目标项目已有 Playwright 或 Puppeteer；动效桥在需要时获取固定版本的外部参考。较大任务要求 20 个流程检查点和迭代记录。当前仅收录源码，未安装，也未为 pipi 等项目调整流程。
+- **来源类型**：第三方修改版（仅添加中文入口与来源记录）。
+- **作者 / 组织**：davaded（GitHub 仓库所有者；其他作者信息待确认）。
+- **原项目地址**：[官方仓库](https://github.com/davaded/frontend-art-direction)；[固定提交的主 Skill](https://github.com/davaded/frontend-art-direction/blob/9696da4c573bada9deea5564af7cfeb159f6fdda/SKILL.md)。
+- **下载地址**：[原版 SKILL.md](https://raw.githubusercontent.com/davaded/frontend-art-direction/9696da4c573bada9deea5564af7cfeb159f6fdda/SKILL.md)；[官方固定提交源码包](https://codeload.github.com/davaded/frontend-art-direction/tar.gz/9696da4c573bada9deea5564af7cfeb159f6fdda)。本次通过 GitHub API 获取发布文件；源码包传输超时，未下载完整压缩包。
+- **版本 / 提交**：`1.0.0`；`9696da4c573bada9deea5564af7cfeb159f6fdda`。
+- **许可证**：待确认。上游根目录未见整体许可证，`package.json` 未声明许可；测试素材的局部许可不代表整个 Skill 的许可。
+- **收录日期**：2026-10-11。
+- **个人修改**：增加中文索引入口和来源记录；按上游发布清单保留 77 个原版文件及维护说明，未改写上游指令或脚本。未收录视觉测试样例和 GitHub CI 配置。详见[来源记录](skills/frontend-art-direction/SOURCE.md)。
 
 ## 新增 Skill
 

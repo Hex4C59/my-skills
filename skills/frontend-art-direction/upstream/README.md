@@ -1,0 +1,158 @@
+# Frontend Art Direction
+
+An execution-focused Codex skill for people who can ship frontend code but do not want the result to be ugly, opaque, or expensive to iterate.
+
+It turns art direction into a small, inspectable loop:
+
+```text
+inspect -> choose -> build -> prove
+```
+
+The skill is deliberately opinionated about evidence and deliberately flexible about style. It does not force every product into a cinematic landing page, a dark dashboard, a component gallery, or a giant headline.
+
+## Install
+
+```bash
+npx -y frontend-art-direction@latest
+```
+
+Restart Codex after installing or updating. Then invoke it explicitly when useful:
+
+```text
+Use $frontend-art-direction to redesign this screen for real users.
+```
+
+## Local Developer Commands
+
+The package contains dependency-free Node 18 utilities for the repository itself and for local project discovery:
+
+```bash
+npm test
+npm run inspect -- /path/to/project --format md
+npm run map -- /path/to/project --query "where is the main navigation?"
+npm run graph -- /path/to/project --query "where is the main navigation?" --format md
+npm run brief -- --query "inventory dashboard for warehouse operators" --format md
+npm run product-context -- status --project /path/to/project
+npm run direction -- --query "AI agent dashboard with approval modal" --profile productive-app --format md
+npm run direction -- --query "我要一个网站" --format json
+npm run direction -- --query "我要一个网站" --concept object-story --format json
+npm run direction -- --query "experimental asymmetric editorial site" --authority artist --creative-direction "An authored typographic reading instrument" --format md
+npm run reference -- --query "AI agent dashboard with approval modal" --format md
+npm run scout -- --query "premium keyboard and mouse product website" --format md
+npm run reference-build -- --query "Build a component gallery for our analytics SDK like Rare UI" --format md
+npm run resource -- --query "accessible modal" --stack react --format md
+npm run audit -- /path/to/project --query "inventory dashboard with partial data" --format md
+npm run surface-mode -- --query "documentation page for a research report" --format md
+npm run design-operation -- --query "现在太方正，排版没有质感" --format md
+npm run design-loop -- --query "hardware product story with responsive states" --format md
+npm run design-loop -- start --project /path/to/project --query "rebuild this visual surface" --format md
+npm run live -- start --project /path/to/project --url http://localhost:5173 --target "[data-art-direction-target]"
+npm run capture -- --url http://localhost:5173 --output /path/to/project/artifacts/baseline.png --viewport 1440x900 --full-page
+npm run image-proposal -- start --project /path/to/project --query "make the stage more authored" --baseline artifacts/baseline.png --gap "the first viewport is visually even"
+npm run critique -- start --project /path/to/project --query "fresh-eyes review" --capture artifacts/after.png --reference artifacts/reference.png --viewport 1440x900 --state default --round 19
+npm run visual-lint -- /path/to/project --format md
+```
+
+The same commands are available through the package binary when it is resolved by npm:
+
+```bash
+frontend-art-direction inspect /path/to/project --format md
+frontend-art-direction map /path/to/project --query "where is the settings form?"
+frontend-art-direction graph /path/to/project --query "where is the settings form?"
+frontend-art-direction brief --query "mobile editor for photographers"
+frontend-art-direction direction --query "AI agent dashboard with approval modal" --profile productive-app
+frontend-art-direction direction --query "a reading tool for field notes" --direction-file ./direction.json --format md
+frontend-art-direction reference --query "AI agent dashboard with approval modal" --profile "agent workspace" --motion "modal continuity"
+frontend-art-direction scout --query "premium hardware product website" --format md
+frontend-art-direction reference-build --query "Build a component gallery for our analytics SDK like Rare UI" --project /path/to/project
+frontend-art-direction resource --query "accessible modal" --stack react
+frontend-art-direction audit /path/to/project --query "mobile editor with undo and loading"
+frontend-art-direction motion --intent "filter list continuity" --project /path/to/project
+frontend-art-direction surface-mode --query "portfolio case study"
+frontend-art-direction design-operation --query "页面太平，想更大胆"
+frontend-art-direction design-loop --query "hardware product story with responsive states"
+frontend-art-direction design-loop start --project /path/to/project --query "rebuild this visual surface"
+frontend-art-direction research-atlas start --project /path/to/project --query "physical product story"
+frontend-art-direction live start --project /path/to/project --url http://localhost:5173 --target "[data-art-direction-target]"
+frontend-art-direction live add-variant --project /path/to/project --session <id> --id variant-1 --path artifacts/variant-1.png --summary "tighter type and wider stage"
+frontend-art-direction live accept --project /path/to/project --session <id> --variant variant-1 --source-diff artifacts/variant-1.diff --path artifacts/after.png
+frontend-art-direction live close --project /path/to/project --session <id>
+frontend-art-direction image-proposal start --project /path/to/project --query "make the stage more authored" --baseline artifacts/baseline.png --gap "the first viewport is visually even"
+frontend-art-direction image-proposal add --project /path/to/project --session <id> --id stage-v1 --path artifacts/proposal.png --prompt "..." --summary "..." --inputs baseline-screenshot,reference --preserve "subject and real content"
+frontend-art-direction image-proposal select --project /path/to/project --session <id> --proposal stage-v1
+frontend-art-direction image-proposal translate --project /path/to/project --session <id> --source-diff artifacts/translation.diff --delta "translated the selected stage relationship into source"
+frontend-art-direction image-proposal record --project /path/to/project --session <id> --kind after --path artifacts/after.png
+frontend-art-direction image-proposal close --project /path/to/project --session <id>
+frontend-art-direction critique start --project /path/to/project --query "fresh-eyes review" --capture artifacts/after.png --reference artifacts/reference.png --viewport 1440x900 --round 19
+frontend-art-direction critique add --project /path/to/project --session <id> --id stage-dominance --severity P1 --region "hero stage / desktop" --observation "The subject stage has no visual dominance." --consequence "The page reads as a generic layout." --evidence artifacts/after.png --repair "Widen the stage and quiet the supporting panel." --confidence render-certain --status resolved
+frontend-art-direction critique verdict --project /path/to/project --session <id> --verdict "CURRENT WINS" --largest-gap "The first stage was too evenly weighted." --next-operation "Recheck the mobile crop." --regression-check "Compare 390x844 and exercise the primary state."
+frontend-art-direction critique close --project /path/to/project --session <id>
+frontend-art-direction visual-lint /path/to/project --format md
+frontend-art-direction capture --url http://localhost:5173 --output /path/to/project/artifacts/baseline.png --viewport 1440x900 --full-page
+frontend-art-direction check
+```
+
+All inspection commands are local-only and read-only by default. `inspect` gives a structural evidence map; `map` ranks relevant files and short source snippets; `graph` resolves relative imports, package edges, unresolved imports, and query neighborhoods; `visual-lint` reports deterministic source findings and suggested operations without claiming taste; `brief` produces design candidates plus scene dials, quality gates, anti-patterns, implementation checks, and both UI-lens and product-reference candidates; `direction` resolves the concrete composition, constraint authority, alignment axis, dominant/counterweight, visual treatment, signature device, type ceiling, spacing rhythm, surface budget, edge character, corner hierarchy, separation strategy, line policy, and advisory AI-default checks; `reference` composes at most four implementation lenses after considering the full local inventory; `scout` ranks global official product references by category and quality signals; `reference-build` always produces an implementation-ready visual build contract; `research-atlas` persists inspected references, section winners, rejected traits, and the original synthesis; `resource` classifies the local decision catalog; `audit` runs the complete pipeline, including visual lint and the internal Transitions.dev motion review by default. These are construction aids, not substitutes for inspecting or editing the target product. `check` validates the skill package and references.
+
+The saved visual references have different jobs: [Rare UI](https://www.rareui.com/), [Rewamp UI](https://www.rewampui.com/components), [Magic UI](https://magicui.design/), [React Bits](https://reactbits.dev/), [Aceternity UI](https://ui.aceternity.com/), and [Obsidian UI](https://www.obsidianui.dev/) are source-owned visual or component lenses; Rewamp UI specifically contributes the searchable rail, stable single-specimen stage, action dock, and mobile re-staging pattern of a component workbench. [Beautiful UI](https://beautifului.dev/) and [beUI](https://beui.dev/) are state/motion specimen lenses; [Bencho](https://bencho.dev/) and [Design Spells](https://designspells.com/) are interaction research; [Transitions.dev](https://transitions.dev/skill) governs motion review; [Impeccable](https://github.com/pbakaus/impeccable) contributes the action vocabulary and the separation between deterministic audit and visual critique; and [shadcn/ui](https://ui.shadcn.com/) supplies source-owned component behavior. They are lenses, not skins to copy wholesale.
+
+When a request only names a product type and gives no example, the skill infers a provisional profile, style, type, palette, and motion grammar with confidence labels. For a request as open as “make a website”, it uses an adaptive default and does not assume commerce, dashboard, or editorial structure. When a real category is present, the product-reference scout feeds a quality-first product source into the build contract; component and motion lenses remain supporting evidence. It selects a saved lens only when a concrete job is present, such as component anatomy, data display, AI state, or motion governance; otherwise it leaves the reference set empty instead of inventing a visual skin.
+
+An adaptive default is not a bland default. Content structure stays provisional, but the visual layer still receives a concrete stance such as `Quiet Editorial Studio`: a tonal canvas, restrained type contrast, one repeatable graphic device, deliberate material rules, and a bounded expression budget. The stance remains provisional until real content, assets, and a rendered target confirm it.
+
+Open requests now expose a provisional concept set instead of silently treating that stance as the answer. The default frames are `Open Field`, `Object Story`, and `Sequence Chapters`; they change composition, reading order, and subject relationship. Choose one with `--concept <id>`, replace them with `--direction-file`, or let an inspected reference/user direction own the frame. These are hypotheses, not a prescribed set of page types.
+
+Visual rules are tiered. Accessibility, the relevant task/state or authored-experience completeness, responsive usability, asset truth, motion fallback, runtime integrity, and rendered proof are hard invariants. Profiles, treatments, anti-AI checks, and reference recipes are advisory defaults. A substantive project `DESIGN.md`, an inspected reference, an accepted concept, explicit user direction, an authored direction file, or an evidence-backed model proposal can override those defaults when the direction remains coherent and the override is recorded and rendered.
+
+The surface/action layer makes the workflow operational: `surface-mode` identifies whether the current route persuades, supports operation, supports reading, or creates an experience; `design-operation` translates feedback such as “太方正”“太乱”“没质感” into one bounded action. An underspecified request remains adaptive instead of being forced into a product genre.
+
+Creativity is an explicit stage of the workflow. On a substantial open request, form 2-3 structurally different concepts before selecting a direction. Compare composition, reading order, dominant object, type/media relationship, interaction model, responsive viability, and implementation cost. Local datasets provide evidence and missing fields; they do not define the answer. Use `--direction-file` when the chosen proposal needs to survive across agents or iterations.
+
+Every substantial output also carries a Product or Experience Signal Contract. Functional work can name an object, task, action, result, data, state, and prototype interaction; narrative or art-directed work can name a subject, thesis, attention path, proof, and ending. The contract protects intent without forcing a dashboard, commerce layout, card grid, CTA, or interaction model. See [references/product-prototype.md](references/product-prototype.md).
+
+The output also includes a Completion Contract. It declares the delivery scope and rejects first-viewport-only work, dead destinations, filler sections, missing mobile composition, unimplemented states, and absent endings. It defines completeness for the chosen form rather than forcing every request into the same page type. For substantial work, `design-loop` emits the 20-round production contract used by `brief` and `audit`; see [references/design-production-loop.md](references/design-production-loop.md) and [docs/research-synthesis.md](docs/research-synthesis.md).
+
+For substantial work, `design-loop start` creates a linked [Research Atlas](references/research-atlas.md). User references are inspected first, section winners can come from different sources, and selected references need local capture or research-artifact evidence before sign-off. A reference name alone never counts as research.
+
+Substantial work uses a visual iteration loop: capture the real render, inspect its defects, change code or assets, and recapture under comparable conditions. `capture` can save a local PNG/JPEG and proof manifest when the target already has Playwright or Puppeteer; it never installs a browser. For an unresolved or bland composition, the agent can edit the inspected screenshot through available image generation, record proposals with `image-proposal`, select a revision, translate it into code and usable assets, and close only after browser comparison. Desktop/mobile coverage includes the full scope and ending. Generated images remain proposals or assets. With a running development target, `live` persists the baseline, variants, accept/discard decision, source diff, and after-capture evidence; `live close` verifies that the local media and accepted source diff exist. See [references/visual-iteration.md](references/visual-iteration.md), [references/live-iteration.md](references/live-iteration.md), and [scripts/image-proposal.mjs](scripts/image-proposal.mjs).
+
+The ordinary default is soft structural geometry: open page fields, a clearly softer dominant stage, tighter secondary panels and controls, and grouping through spacing, tone, inset, crop, overlap, or depth before borders and dividers. This is not a universal rounded-card style. Technical grids, industrial tools, brutalist directions, safety boundaries, and inspected sharp references remain valid when the exception is explicit and localized.
+
+For greenfield visual work with no live target, it can use a concept-first pass: generate a complete visual hypothesis, extract a small design system, implement the first viewport and states, then compare browser screenshots against the concept before handoff. Small existing-product fixes keep the implementation narrow, but still run the same audit and motion/reference checks.
+
+`motion` is an always-on internal bridge in every full audit. It fetches the pinned Transitions.dev Skill into a private cache when needed, runs the `Review -> Apply -> Polish` plan with purpose, cleanup, reduced-motion, and fallback checks, and then lets the evidence decide whether the final surface stays static or uses motion. Users do not need to install transitions.dev or a motion library separately.
+
+When a target project contains a substantive root `DESIGN.md`, `inspect`, `brief`, `reference-build`, and `audit` expose it as project-owned visual authority. The local directions remain gap-fill candidates. Use `--reference-inspected` after actually inspecting a supplied reference, or `--authority artist|model` when the current pass has an intentional authored direction. These flags do not disable accessibility, state, responsive, asset, motion fallback, runtime, or rendered-proof checks; they only prevent local anti-AI preferences from overriding a better visual decision.
+
+Root `PRODUCT.md` holds audience, purpose, subject, and other durable facts separately from visual direction. `product-context init` creates it from supplied facts, `status` reads it, and `template` prints a blank version; existing files require explicit `--force` to replace. `brief`, `direction --project`, `reference-build`, and `audit` use positive product facts only when the current request is unresolved. Non-goals do not become genre matches, frameworks and route names do not define the product, and the current page job takes precedence. See [references/design-system.md](references/design-system.md#product-context).
+
+For machine-readable output through npm scripts, add npm's quiet flag: `npm run --silent brief -- --query "..." --format json`.
+
+## What It Changes In Practice
+
+- starts with the user's workflow, device, content, and existing UI evidence
+- keeps the core instructions small and loads detailed guidance only by mode
+- makes type, component shape, motion, media readiness, and verification explicit decisions
+- locks composition, alignment, type scale, spacing rhythm, surface/card budget, edge hierarchy, separation strategy, and line policy before decorative styling, while allowing an authored concept to replace those candidates
+- runs a premium-finish pass for grayscale hierarchy, optical alignment, material layers, specific copy, and restrained interaction instead of equating “高级” with gradients, glass, glow, or oversized type
+- treats user-provided assets as authoritative and requires sourced or generated production-quality media instead of placeholders or low-quality filler
+- uses mature primitives without inheriting their default visual identity
+- requires a meaningful state transition and a reduced-motion or static fallback for substantial UI work
+- reports proof separately from assumptions and blockers
+
+## Package Shape
+
+```text
+SKILL.md                 short router and quality contract
+references/              mode-specific guidance
+  scripts/                 inspect, graph, visual-lint, brief, direction, reference, reference-build, resource, audit, motion, research atlas, surface/action routing, live, image-proposal, and critique journals, validation
+data/                    local decision, visual-direction, quality-gate, resource, lens, and recipe datasets
+templates/               reusable DESIGN.md and evidence files
+docs/                    architecture and maintenance notes
+agents/openai.yaml       Codex display metadata
+bin/                     installer and local command entrypoint
+```
+
+## Scope
+
+This is a frontend judgment and execution aid. It does not replace product requirements, accessibility review, performance profiling, legal review of assets, or a real design system owned by the project. It also does not claim that a static build proves a polished interface.
