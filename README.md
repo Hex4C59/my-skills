@@ -17,17 +17,21 @@ my-skills/
 
 ## Skill 总览
 
-已收录 **11 个项目入口**：图片中第 2、3、4、5、6、8、9 项，以及 `git-commit`、`writing-for-agents`、`writing-clearly-and-concisely`、`frontend-art-direction`，收录日期为 **2026-10-11**。每项保留固定提交的上游源码、中文入口及来源记录，许可证或许可说明见各项介绍。前 7 项保留完整仓库快照；frontend-art-direction 保留上游发布文件与维护说明；其余项目保留各自的具体 Skill 目录。快照中的其他 Skill、变体和宿主适配不另行计入本表。
+已收录 **15 个项目入口**：图片中第 2、3、4、5、6、8、9 项，以及 `git-commit`、`writing-for-agents`、`writing-clearly-and-concisely`、`frontend-art-direction`、`humanizer-zh`、`resume-tailor`、`resume-bullet-writer`、`interview-prep-generator`。其中 `humanizer-zh`、`resume-tailor`、`resume-bullet-writer` 和 `interview-prep-generator` 收录于 **2026-10-13**，其余入口收录于 **2026-10-11**。每项保留固定提交的上游源码、中文入口及来源记录，许可证或许可说明见各项介绍。前 7 项与 humanizer-zh 保留完整仓库快照；frontend-art-direction 保留上游发布文件与维护说明；其余项目保留各自的具体 Skill 目录。快照中的其他 Skill、变体和宿主适配不另行计入本表。
 
-`skills/` 用于源码维护。Humanizer、Agent-Reach、git-commit 与 writing-for-agents 已按用户授权安装到当前项目的 `.agents/skills/`；其余 7 个项目保留源码收录状态。文字和技术说明统一使用 humanizer；Agent 指令文档使用 writing-for-agents，由它调用 humanizer。writing-clearly-and-concisely 保留源码参考，已撤下项目安装。Agent-Reach 的核心 CLI 与 Python 依赖安装在项目独立环境中，详见下方“当前项目安装”。
+`skills/` 用于源码维护。Humanizer、Humanizer-zh、Agent-Reach、git-commit 与 writing-for-agents 已按用户授权安装到当前项目的 `.agents/skills/`；其余 10 个项目保留源码收录状态。文字和技术说明统一使用 humanizer；Agent 指令文档使用 writing-for-agents，由它调用 humanizer。writing-clearly-and-concisely 保留源码参考，已撤下项目安装。Agent-Reach 的核心 CLI 与 Python 依赖安装在项目独立环境中，详见下方“当前项目安装”。
 
 | Skill | 用途 | 来源类型 | 原项目 / 下载地址 |
 | --- | --- | --- | --- |
 | [humanizer](skills/humanizer/SKILL.md) | 用易懂语言编写或润色文字，解释陌生术语，去掉 AI 套话并保留事实。 | 第三方修改版（中文表达与润色） | [官方项目](https://github.com/blader/humanizer) / [固定提交下载](https://codeload.github.com/blader/humanizer/tar.gz/225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8) |
+| [humanizer-zh](skills/humanizer-zh/SKILL.md) | 润色中文文章、评论和文档，处理空话、重复及模板化表达，保留事实与作者语气。 | 第三方（原样收录） | [官方项目](https://github.com/op7418/Humanizer-zh) / [固定提交下载](https://codeload.github.com/op7418/Humanizer-zh/tar.gz/f4518a8eab97b8bfebc66a89d34320a89bef6930) |
 | [ui-ux-pro-max-skill](skills/ui-ux-pro-max-skill/SKILL.md) | 通过本地设计数据与搜索脚本辅助界面设计、实现和 UX 检查。 | 第三方修改版（仅入口包装） | [官方项目](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) / [固定提交下载](https://codeload.github.com/nextlevelbuilder/ui-ux-pro-max-skill/tar.gz/67803eac81607188194aea9842a723b89326d90d) |
 | [taste-skill](skills/taste-skill/SKILL.md) | 根据需求选择前端视觉方向，改善落地页、作品集及改版页面的模板感。 | 第三方修改版（仅入口包装） | [官方项目](https://github.com/Leonxlnx/taste-skill) / [固定提交下载](https://codeload.github.com/Leonxlnx/taste-skill/tar.gz/717446e07a78d4e6d7918b1fde1a263378eebac9) |
 | [agent-reach](skills/agent-reach/SKILL.md) | 为 Agent 提供跨平台搜索、页面读取和信息获取的工具路由。 | 第三方修改版（仅入口包装） | [官方项目](https://github.com/Panniantong/Agent-Reach) / [固定提交下载](https://codeload.github.com/Panniantong/Agent-Reach/tar.gz/94f06c1969dfc1834001269d79d3ad0972d9dee6) |
 | [career-ops](skills/career-ops/SKILL.md) | 组织求职工作流，支持岗位检索、职位评估、简历定制和申请进度管理。 | 第三方修改版（仅入口包装） | [官方项目](https://github.com/career-ops-hq/career-ops) / [固定提交下载](https://codeload.github.com/career-ops-hq/career-ops/tar.gz/7e0a3d0babbb5ed5eeb599cd7dac8708866fdd13) |
+| [resume-tailor](skills/resume-tailor/SKILL.md) | 对照目标岗位调整简历摘要、技能顺序和经历表述，生成适合该岗位的版本，并记录修改理由。 | 第三方修改版（中文入口与使用说明） | [官方 Skill](https://github.com/Paramchoudhary/ResumeSkills/tree/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-tailor) / [主文件下载](https://raw.githubusercontent.com/Paramchoudhary/ResumeSkills/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-tailor/SKILL.md) |
+| [resume-bullet-writer](skills/resume-bullet-writer/SKILL.md) | 逐条润色简历中的工作与项目经历，突出具体行动、个人贡献和成果。 | 第三方修改版（中文入口与指标说明） | [官方 Skill](https://github.com/Paramchoudhary/ResumeSkills/tree/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-bullet-writer) / [主文件下载](https://raw.githubusercontent.com/Paramchoudhary/ResumeSkills/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-bullet-writer/SKILL.md) |
+| [interview-prep-generator](skills/interview-prep-generator/SKILL.md) | 从简历和目标岗位提取可能被追问的问题，整理回答要点、自我介绍、项目故事和向面试官提问的清单。 | 第三方修改版（中文入口与使用说明） | [官方 Skill](https://github.com/Paramchoudhary/ResumeSkills/tree/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/interview-prep-generator) / [主文件下载](https://raw.githubusercontent.com/Paramchoudhary/ResumeSkills/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/interview-prep-generator/SKILL.md) |
 | [last30days-skill](skills/last30days-skill/SKILL.md) | 围绕主题调研最近 30 天的讨论、事件和趋势。 | 第三方修改版（仅入口包装） | [官方项目](https://github.com/mvanhorn/last30days-skill) / [固定提交下载](https://codeload.github.com/mvanhorn/last30days-skill/tar.gz/267d50f7fcbab8a6457a93ad6ca15cbc199f633c) |
 | [understand-anything](skills/understand-anything/SKILL.md) | 分析代码库的架构、组件与关系，生成可交互浏览的知识图谱。 | 第三方修改版（仅入口包装） | [官方项目](https://github.com/Egonex-AI/Understand-Anything) / [固定提交下载](https://codeload.github.com/Egonex-AI/Understand-Anything/tar.gz/000fbf3f36b5e534a0a8d3461cf24f5dc9ae43fe) |
 | [git-commit](skills/git-commit/SKILL.md) | 分析 Git diff、生成提交信息并按用户要求执行提交。 | 第三方修改版（仅入口包装） | [官方 Skill](https://github.com/github/awesome-copilot/tree/82701c24b99488536ca399ff4789a458b7a05db7/skills/git-commit) / [主文件下载](https://raw.githubusercontent.com/github/awesome-copilot/82701c24b99488536ca399ff4789a458b7a05db7/skills/git-commit/SKILL.md) |
@@ -44,6 +48,8 @@ skills/<skill-name>/
 ├── LICENSE      # 上游提供时保留的许可证副本；其他许可说明见 SOURCE.md
 └── upstream/    # 原样保留的上游仓库或具体 Skill 目录快照
 ```
+
+humanizer-zh 原样保存上游中文仓库文件，直接使用目录中的 `SKILL.md`，另附本地 `SOURCE.md`，无需 `upstream/` 包装。
 
 使用某项时先读其入口，再按原版说明配置所需工具。上游命令的相对路径应根据入口中的路径提示解析。
 
@@ -66,6 +72,24 @@ skills/<skill-name>/
 - **许可证**：上游根许可证为 [MIT](skills/humanizer/LICENSE)；其他随附许可证和声明保留于 `upstream/`。
 - **收录日期**：2026-10-11。
 - **个人修改**：中文入口合并首次术语解释、具体行为、按需举例和交付前检查；由 writing-for-agents 调用时统一检查表达。项目安装同步此修改版，上游原文保持不变。详见[来源记录](skills/humanizer/SOURCE.md)。
+
+### humanizer-zh
+
+- **指令文件**：[上游中文 SKILL.md](skills/humanizer-zh/SKILL.md)；[项目安装入口](.agents/skills/humanizer-zh/SKILL.md)；[上游说明](skills/humanizer-zh/README.md)。
+- **用途**：编辑中文文章、评论和文档中的空话、重复及模板化表达，保留事实、确定程度和作者声音。
+- **适用场景**：已有中文文章、博客、评论、技术文档、商务或学术文本的润色与审阅。
+- **使用示例**：请读取 `skills/humanizer-zh/SKILL.md`，按其中规则润色下面的中文文章，保留事实、条件和作者语气。
+- **所需输入**：待修改的中文文本或文件；可选作者写作样本、目标文体和编辑范围。
+- **预期输出**：默认交付最终改写稿；只审阅时给出建议，用户明确要求修改文件时才写回。
+- **依赖与限制**：Skill 执行依赖语言模型，无额外程序依赖；随附结构检查脚本需要 Python 3。规则不用于判断作者身份，也不保证通过 AI 检测器。已安装到下文列出的 9 个项目；安装文件校验通过，实际模型润色效果尚未评测。
+- **来源类型**：第三方（原样收录）。
+- **作者 / 组织**：op7418（GitHub 仓库所有者；许可证署名为「歸藏」）。
+- **原项目地址**：[官方仓库](https://github.com/op7418/Humanizer-zh)；[固定提交的主 Skill](https://github.com/op7418/Humanizer-zh/blob/f4518a8eab97b8bfebc66a89d34320a89bef6930/SKILL.md)。
+- **下载地址**：[官方固定提交源码包](https://codeload.github.com/op7418/Humanizer-zh/tar.gz/f4518a8eab97b8bfebc66a89d34320a89bef6930)。
+- **版本 / 提交**：SKILL 元数据 `revision: 2026-09-23`；`f4518a8eab97b8bfebc66a89d34320a89bef6930`。仓库未声明独立版本号；其参考来源中的 v3.0.0 指 blader/humanizer 上游版本。
+- **许可证**：[MIT](skills/humanizer-zh/LICENSE)。
+- **收录日期**：2026-10-13。
+- **收录内容**：完整保留上游 9 个文件，包括规则、README、许可证、更新记录、结构检查脚本及样例。仅新增[来源记录](skills/humanizer-zh/SOURCE.md)，未改写上游文件。
 
 ### ui-ux-pro-max-skill
 
@@ -138,6 +162,60 @@ skills/<skill-name>/
 - **许可证**：上游根许可证为 [MIT](skills/career-ops/LICENSE)；其他随附许可证和声明保留于 `upstream/`。
 - **收录日期**：2026-10-11。
 - **个人修改**：添加中文 `SKILL.md` 入口、`SOURCE.md` 和根许可证副本；`upstream/` 内原版文件未改动。详见 [来源记录](skills/career-ops/SOURCE.md)。
+
+### resume-tailor
+
+- **指令文件**：[中文收录入口](skills/resume-tailor/SKILL.md)；[上游原版](skills/resume-tailor/upstream/SKILL.md)。
+- **用途**：对照目标岗位调整简历摘要、技能顺序和经历表述，生成适合该岗位的版本，并记录修改理由。
+- **适用场景**：已有完整简历，需要针对不同岗位调整重点；检查哪些经历与目标岗位相关。
+- **使用示例**：请用 resume-tailor 对照这份职位描述修改我的中文简历，逐条说明修改理由，保留真实经历和已有指标。
+- **所需输入**：现有简历、目标岗位的职位描述；可提供已有岗位分析结果、输出语言与格式要求。
+- **预期输出**：针对岗位的简历调整方案或修改稿，包括摘要前后对照、技能顺序、经历修改及关键词说明。
+- **依赖与限制**：主要依赖语言模型，无随附脚本或额外 Python、Node.js 依赖。上游先使用 `job-description-analyzer`，本次未收录该配套 Skill；可使用已有岗位分析结果，或由当前 Agent 先分析职位描述。未附 DOCX/PDF 导出或招聘系统匹配验证工具。
+- **来源类型**：第三方修改版（中文入口与使用说明；上游原文保持不变）。
+- **作者 / 组织**：Paramchoudhary / ResumeSkills 项目；根许可证署名 Resume Skills。
+- **原项目地址**：[官方仓库](https://github.com/Paramchoudhary/ResumeSkills)；[固定提交的 Skill 目录](https://github.com/Paramchoudhary/ResumeSkills/tree/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-tailor)。
+- **下载地址**：[原版 SKILL.md](https://raw.githubusercontent.com/Paramchoudhary/ResumeSkills/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-tailor/SKILL.md)；[官方固定提交源码包](https://codeload.github.com/Paramchoudhary/ResumeSkills/tar.gz/74ae19e7c62b0516d1c298328e5544976c12da5d)。
+- **版本 / 提交**：无独立版本字段；`74ae19e7c62b0516d1c298328e5544976c12da5d`。
+- **许可证**：[MIT](skills/resume-tailor/LICENSE)。
+- **收录日期**：2026-10-13。
+- **个人修改**：添加中文收录入口与来源说明；中文入口说明可使用已有岗位分析结果，或由当前 Agent 先分析职位描述。上游主 Skill 未改动。详见[来源记录](skills/resume-tailor/SOURCE.md)。
+
+### resume-bullet-writer
+
+- **指令文件**：[中文收录入口](skills/resume-bullet-writer/SKILL.md)；[上游原版](skills/resume-bullet-writer/upstream/SKILL.md)。
+- **用途**：逐条修改简历中的工作和项目经历，把笼统的职责描述写成具体行动、贡献与成果，并说明修改理由。
+- **适用场景**：经历描述过于笼统；需要突出个人贡献、明确项目规模或压缩条目长度。
+- **使用示例**：请用 resume-bullet-writer 润色我的中文项目经历，逐条给出原文、修改稿和修改理由，保留真实数据。
+- **所需输入**：现有简历条目、实际工作或项目细节、已有成果指标；可提供目标岗位、输出语言和格式要求。
+- **预期输出**：简历条目的修改稿、原文对照、修改理由，以及需要补充或核实的指标与经历细节。
+- **依赖与限制**：主要依赖语言模型，无随附脚本或额外 Python、Node.js 依赖；未附 DOCX/PDF 排版和导出工具。原版强调量化并提供估算方法；估计需标明并核实，缺少依据的成果列为待补充。
+- **来源类型**：第三方修改版（中文入口与指标说明；上游原文保持不变）。
+- **作者 / 组织**：Paramchoudhary / ResumeSkills 项目；根许可证署名 Resume Skills。
+- **原项目地址**：[官方仓库](https://github.com/Paramchoudhary/ResumeSkills)；[固定提交的 Skill 目录](https://github.com/Paramchoudhary/ResumeSkills/tree/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-bullet-writer)。
+- **下载地址**：[原版 SKILL.md](https://raw.githubusercontent.com/Paramchoudhary/ResumeSkills/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/resume-bullet-writer/SKILL.md)；[官方固定提交源码包](https://codeload.github.com/Paramchoudhary/ResumeSkills/tar.gz/74ae19e7c62b0516d1c298328e5544976c12da5d)。
+- **版本 / 提交**：无独立版本字段；`74ae19e7c62b0516d1c298328e5544976c12da5d`。
+- **许可证**：[MIT](skills/resume-bullet-writer/LICENSE)。
+- **收录日期**：2026-10-13。
+- **个人修改**：添加中文入口与来源记录，说明已确认指标、待核实估计和缺少依据的成果如何处理；上游主 Skill 未改动。详见[来源记录](skills/resume-bullet-writer/SOURCE.md)。
+
+### interview-prep-generator
+
+- **指令文件**：[中文收录入口](skills/interview-prep-generator/SKILL.md)；[上游原版](skills/interview-prep-generator/upstream/SKILL.md)。
+- **用途**：从简历和目标岗位提取可能被追问的问题，整理回答要点、自我介绍、项目故事和向面试官提问的清单。
+- **适用场景**：面试前梳理项目和工作经历；准备行为面试、岗位相关问题和简历追问。
+- **使用示例**：请用 interview-prep-generator 根据我的简历和这份职位描述，生成中文面试问题、项目追问和回答要点，缺少的经历细节标为待补充。
+- **所需输入**：简历、目标岗位；建议提供职位描述、公司名称和面试类型。公司资料及成果数据按实际掌握的材料补充。
+- **预期输出**：岗位能力分析、面试问题、STAR 项目故事、自我介绍、回答要点、反问清单及已有公司资料的整理。
+- **依赖与限制**：主要依赖语言模型，无随附脚本或额外 Python、Node.js 依赖；公司调研按需使用用户资料或现有搜索工具。预测问题不代表公司实际题库，完整流程尚未验证。
+- **来源类型**：第三方修改版（中文入口与使用说明；上游原文保持不变）。
+- **作者 / 组织**：Paramchoudhary / ResumeSkills 项目；根许可证署名 Resume Skills。
+- **原项目地址**：[官方仓库](https://github.com/Paramchoudhary/ResumeSkills)；[固定提交的 Skill 目录](https://github.com/Paramchoudhary/ResumeSkills/tree/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/interview-prep-generator)。
+- **下载地址**：[原版 SKILL.md](https://raw.githubusercontent.com/Paramchoudhary/ResumeSkills/74ae19e7c62b0516d1c298328e5544976c12da5d/skills/interview-prep-generator/SKILL.md)；[官方固定提交源码包](https://codeload.github.com/Paramchoudhary/ResumeSkills/tar.gz/74ae19e7c62b0516d1c298328e5544976c12da5d)。
+- **版本 / 提交**：无独立版本字段；`74ae19e7c62b0516d1c298328e5544976c12da5d`。
+- **许可证**：[MIT](skills/interview-prep-generator/LICENSE)。
+- **收录日期**：2026-10-13。
+- **个人修改**：添加中文收录入口与来源说明，解释 STAR 方法，并说明材料缺失时标记待补充。上游主 Skill 未改动。详见[来源记录](skills/interview-prep-generator/SOURCE.md)。
 
 ### last30days-skill
 
@@ -287,18 +365,20 @@ skills/<skill-name>/
 
 ### 当前项目安装
 
-安装日期：2026-10-11。使用项目级 `.agents/skills/` 目录，版本与上方收录的固定提交一致。
+humanizer-zh 安装日期：2026-10-13；其余 Skill 安装日期：2026-10-11。使用项目级 `.agents/skills/` 目录，版本与上方收录的固定提交一致。
 
 | Skill | 项目安装入口 | 运行依赖 |
 | --- | --- | --- |
 | humanizer | [已安装 SKILL.md](.agents/skills/humanizer/SKILL.md) | 无额外程序依赖 |
+| humanizer-zh | [已安装 SKILL.md](.agents/skills/humanizer-zh/SKILL.md) | 无额外程序依赖；可选结构检查脚本需要 Python 3 |
 | agent-reach | [已安装 SKILL.md](.agents/skills/agent-reach/SKILL.md) | 核心 CLI 1.5.0 和 Python 依赖位于 `.venv/agent-reach/` |
 | git-commit | [已安装 SKILL.md](.agents/skills/git-commit/SKILL.md) | Git CLI 和已初始化的目标 Git 仓库 |
 | writing-for-agents | [已安装 SKILL.md](.agents/skills/writing-for-agents/SKILL.md) | humanizer Skill；无额外程序依赖 |
 
-下一轮对话可显式使用 `$humanizer`、`$agent-reach`、`$git-commit` 或 `$writing-for-agents`。例如：
+下一轮对话可显式使用 `$humanizer`、`$humanizer-zh`、`$agent-reach`、`$git-commit` 或 `$writing-for-agents`。例如：
 
 - `$humanizer 修改这份实现说明，解释陌生术语，去掉套话，保留代码实际支持的条件和限制。`
+- `$humanizer-zh 润色这篇中文文章，保留事实、限定条件和作者语气。`
 - `$agent-reach 请搜索这个主题的公开资料，并整理来源。`
 - `$git-commit 分析当前改动，先生成中文提交信息供我审查。`
 - `$writing-for-agents 审查当前 AGENTS.md 的表达和结构，先列出修改建议供我审查。`
@@ -329,7 +409,19 @@ humanizer 已合并中文表达规则，上游主文件保留为普通参考文�
 
 2026-10-11 已将当前版本同步至使用这两个 Skill 的本机项目：my-skills、remote-desktop、Hex4C59、pipi、微信读书、Cpp八股文面试、Cpp_learning_game，并更新本机用户级 humanizer。使用 writing-for-agents 的项目已补齐同级 humanizer。另检查了 Windows 项目 deepseek-harness，未发现安装这两个 Skill，因此未新增。
 
-安装追溯：[Humanizer](.agents/skills/humanizer/SOURCE.md)、[Agent-Reach](.agents/skills/agent-reach/SOURCE.md)、[git-commit](.agents/skills/git-commit/SOURCE.md)、[writing-for-agents](.agents/skills/writing-for-agents/SOURCE.md)。
+2026-10-13 核对 Codex 已保存的 22 个项目，确认上述 7 个项目已经安装 humanizer，并将 humanizer-zh 安装到各自的 `.agents/skills/humanizer-zh/`。7 份安装副本均保留上游 9 个原版文件及安装来源记录，完整性、元数据和本地引用检查通过；实际模型润色效果尚未评测。
+
+同日按用户另行授权，将同一版本的 humanizer-zh 安装到小红书运营项目。当时共安装到 8 个项目；小红书运营此次仅安装 humanizer-zh。
+
+同日按用户另行授权，将同一版本的 humanizer-zh 安装到 RTC实时通信笔记项目。当前共安装到 9 个项目；RTC实时通信笔记此次仅安装 humanizer-zh。
+
+安装追溯：[Humanizer](.agents/skills/humanizer/SOURCE.md)、[Humanizer-zh](.agents/skills/humanizer-zh/SOURCE.md)、[Agent-Reach](.agents/skills/agent-reach/SOURCE.md)、[git-commit](.agents/skills/git-commit/SOURCE.md)、[writing-for-agents](.agents/skills/writing-for-agents/SOURCE.md)。
+
+### 求职 Skill 的跨项目安装
+
+2026-10-13 按用户授权，将 resume-tailor、resume-bullet-writer 和 interview-prep-generator 安装到“面试简历”项目的 `.agents/skills/`。三个安装副本使用相同固定提交，保留中文入口、上游原文、MIT 许可证及安装来源记录；本项目仍保留源码收录状态。
+
+安装追溯：[resume-tailor](skills/resume-tailor/SOURCE.md)、[resume-bullet-writer](skills/resume-bullet-writer/SOURCE.md)、[interview-prep-generator](skills/interview-prep-generator/SOURCE.md)。入口格式、本地链接和原文完整性检查通过；真实简历及面试准备效果尚未评测。
 
 维护本集合时遵循 [AGENTS.md](AGENTS.md)。
 
